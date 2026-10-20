@@ -11,14 +11,14 @@
     </PageDescription>
 
     <ToolbarLeft>
-        <button class="btn btn-primary shadow-sm" @onclick="() => modalLocalRef?.Abrir()">
+        <button class="btn btn-primary shadow-sm" data-tutorial="locais-novo" @onclick="() => modalLocalRef?.Abrir()">
             <i class="bi bi-plus-circle-fill me-1"></i>
             <span>Novo Almoxarifado</span>
         </button>
     </ToolbarLeft>
 
     <ToolbarRight>
-        <div class="input-group input-group-sm" style="max-width: 250px;">
+        <div class="input-group input-group-sm" style="max-width: 250px;" data-tutorial="locais-busca">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" class="form-control" placeholder="Buscar por código ou nome..." @bind="termoPesquisa" @bind:event="oninput" />
         </div>
@@ -47,7 +47,7 @@
         }
         else
         {
-            <div class="card card-modern overflow-hidden">
+            <div class="card card-modern overflow-hidden" data-tutorial="locais-tabela">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">

@@ -13,14 +13,14 @@
     </PageDescription>
 
     <ToolbarLeft>
-        <button class="btn btn-primary shadow-sm" @onclick="AbrirModalNovo">
+        <button class="btn btn-primary shadow-sm" data-tutorial="fornecedores-novo" @onclick="AbrirModalNovo">
             <i class="bi bi-plus-circle-fill me-1"></i>
             <span>Novo Fornecedor</span>
         </button>
     </ToolbarLeft>
 
     <ToolbarRight>
-        <div class="input-group input-group-sm" style="max-width: 260px;">
+        <div class="input-group input-group-sm" style="max-width: 260px;" data-tutorial="fornecedores-busca">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" class="form-control" placeholder="Buscar fornecedor..." @bind="termoPesquisa" @bind:event="oninput" />
         </div>
@@ -49,7 +49,7 @@
         }
         else
         {
-            <div class="card card-modern overflow-hidden">
+            <div class="card card-modern overflow-hidden" data-tutorial="fornecedores-tabela">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">

@@ -1,0 +1,20 @@
+@page "/"
+@page "/home"
+@using JT_Estoque.Web.Pages.Estoque
+
+<PageTitle>Dashboard de Estoque & Logística</PageTitle>
+
+<EstoqueDashboard />
+
+@code {
+    [CascadingParameter]
+    public Func<string, Task>? SetPageTitleAsync { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (SetPageTitleAsync != null)
+        {
+            await SetPageTitleAsync.Invoke("Dashboard de Estoque & Logística");
+        }
+    }
+}

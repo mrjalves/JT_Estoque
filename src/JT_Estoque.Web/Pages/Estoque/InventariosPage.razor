@@ -15,7 +15,7 @@
     </PageDescription>
 
     <ToolbarLeft>
-        <button class="btn btn-primary shadow-sm" @onclick="() => modalInventarioRef?.Abrir()">
+        <button class="btn btn-primary shadow-sm" data-tutorial="inventarios-novo" @onclick="() => modalInventarioRef?.Abrir()">
             <i class="bi bi-plus-circle-fill me-1"></i>
             <span>Nova Sessão de Inventário</span>
         </button>
@@ -47,7 +47,7 @@
         }
         else
         {
-            <div class="card card-modern overflow-hidden">
+            <div class="card card-modern overflow-hidden" data-tutorial="inventarios-tabela">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
@@ -87,7 +87,7 @@
                                         @inv.Observacoes
                                     </td>
                                     <td class="text-end">
-                                        <div class="btn-group btn-group-sm">
+                                        <div class="btn-group btn-group-sm" data-tutorial="inventarios-acoes">
                                             <button class="btn btn-outline-primary" title="Contagem / Apurar Itens" @onclick="() => AbrirModalItens(inv)">
                                                 <i class="bi bi-card-checklist me-1"></i>
                                                 <span>Contagem</span>

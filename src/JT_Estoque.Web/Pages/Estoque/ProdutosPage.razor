@@ -14,12 +14,12 @@
     </PageDescription>
 
     <ToolbarLeft>
-        <button class="btn btn-primary shadow-sm" @onclick="() => modalProdutoRef?.Abrir()">
+        <button class="btn btn-primary shadow-sm" data-tutorial="produtos-novo" @onclick="() => modalProdutoRef?.Abrir()">
             <i class="bi bi-plus-circle-fill me-1"></i>
             <span>Novo Produto</span>
         </button>
 
-        <div class="btn-group shadow-sm ms-2" role="group">
+        <div class="btn-group shadow-sm ms-2" role="group" data-tutorial="produtos-filtros-saude">
             <button type="button" class="btn @(filtroSaude == "todos" ? "btn-secondary" : "btn-outline-secondary") btn-sm" @onclick='() => SetFiltroSaude("todos")'>
                 Todos (@produtos.Count)
             </button>
@@ -33,7 +33,7 @@
     </ToolbarLeft>
 
     <ToolbarRight>
-        <div class="input-group input-group-sm" style="max-width: 280px;">
+        <div class="input-group input-group-sm" style="max-width: 280px;" data-tutorial="produtos-busca">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" class="form-control" placeholder="Buscar por SKU ou Nome..." @bind="termoPesquisa" @bind:event="oninput" />
         </div>
@@ -62,7 +62,7 @@
         }
         else
         {
-            <div class="card card-modern overflow-hidden">
+            <div class="card card-modern overflow-hidden" data-tutorial="produtos-tabela">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">

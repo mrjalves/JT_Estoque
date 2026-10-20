@@ -98,6 +98,7 @@ builder.Services.AddScoped<FornecedorService>();
 builder.Services.AddScoped<IMenuProvider, EstoqueMenuProvider>();
 builder.Services.AddScoped<IModuloMenuProvider, EstoqueMenuProvider>();
 builder.Services.AddScoped<IModuloCategoriaProvider, EstoqueCategoriaProvider>();
+builder.Services.AddScoped<ITutorialProvider, EstoqueTutorialProvider>();
 
 builder.Services.AddScoped<IAToolBase, ConsultarRupturaEstoqueTool>();
 builder.Services.AddScoped<IAToolBase, ConsultarKardexProdutoTool>();

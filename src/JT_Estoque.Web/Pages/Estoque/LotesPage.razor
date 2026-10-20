@@ -14,12 +14,12 @@
     </PageDescription>
 
     <ToolbarLeft>
-        <button class="btn btn-primary shadow-sm" @onclick="() => modalLoteRef?.Abrir()">
+        <button class="btn btn-primary shadow-sm" data-tutorial="lotes-novo" @onclick="() => modalLoteRef?.Abrir()">
             <i class="bi bi-plus-circle-fill me-1"></i>
             <span>Novo Lote</span>
         </button>
 
-        <div class="btn-group shadow-sm ms-2" role="group">
+        <div class="btn-group shadow-sm ms-2" role="group" data-tutorial="lotes-filtros-status">
             <button type="button" class="btn @(filtroStatus == "todos" ? "btn-secondary" : "btn-outline-secondary") btn-sm" @onclick='() => filtroStatus = "todos"'>
                 Todos (@lotes.Count)
             </button>
@@ -36,7 +36,7 @@
     </ToolbarLeft>
 
     <ToolbarRight>
-        <div class="input-group input-group-sm" style="max-width: 250px;">
+        <div class="input-group input-group-sm" style="max-width: 250px;" data-tutorial="lotes-busca">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" class="form-control" placeholder="Buscar código do lote..." @bind="termoPesquisa" @bind:event="oninput" />
         </div>
@@ -65,7 +65,7 @@
         }
         else
         {
-            <div class="card card-modern overflow-hidden">
+            <div class="card card-modern overflow-hidden" data-tutorial="lotes-tabela">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">

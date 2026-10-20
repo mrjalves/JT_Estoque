@@ -3,7 +3,9 @@
 @using JT_Servicos.Interfaces
 @inherits JT_UserInterface.Shared.Pages.Comum.ConfiguracoesBase<MGestaoConfiguracao, IMGestaoConfiguracaoService>
 
-@RenderizarFormularioConfiguracoes()
+<div data-tutorial="configuracoes-pagina">
+    @RenderizarFormularioConfiguracoes()
+</div>
 
 @code {
     public override string ObterTituloPagina() => "Configurações de Estoque & Gestão";

@@ -14,7 +14,7 @@
     </PageDescription>
 
     <ToolbarLeft>
-        <button class="btn btn-primary shadow-sm" @onclick="() => modalMovimentacaoRef?.Abrir()">
+        <button class="btn btn-primary shadow-sm" data-tutorial="movimentacoes-novo" @onclick="() => modalMovimentacaoRef?.Abrir()">
             <i class="bi bi-plus-circle-fill me-1"></i>
             <span>Nova Movimentação</span>
         </button>
@@ -23,7 +23,7 @@
     <ToolbarRight>
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <!-- Filtro Produto -->
-            <select class="form-select form-select-sm" style="max-width: 200px;" @bind="filtroProdutoId">
+            <select class="form-select form-select-sm" style="max-width: 200px;" data-tutorial="movimentacoes-filtro-produto" @bind="filtroProdutoId">
                 <option value="0">Todos os Produtos</option>
                 @foreach (var p in produtos)
                 {
@@ -32,7 +32,7 @@
             </select>
 
             <!-- Filtro Almoxarifado -->
-            <select class="form-select form-select-sm" style="max-width: 180px;" @bind="filtroLocalId">
+            <select class="form-select form-select-sm" style="max-width: 180px;" data-tutorial="movimentacoes-filtro-local" @bind="filtroLocalId">
                 <option value="0">Todos os Locais</option>
                 @foreach (var l in locais)
                 {
@@ -65,7 +65,7 @@
         }
         else
         {
-            <div class="card card-modern overflow-hidden">
+            <div class="card card-modern overflow-hidden" data-tutorial="movimentacoes-tabela">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
