@@ -114,9 +114,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(
-        typeof(MainLayout).Assembly,
-        typeof(ProdutoEstoque).Assembly,
-        typeof(Program).Assembly
+        typeof(MainLayout).Assembly
     );
 
 app.Run();

@@ -4,7 +4,7 @@
 
 <CascadingAuthenticationState>
     <Router AppAssembly="typeof(Program).Assembly"
-            AdditionalAssemblies="new[] { typeof(MainLayout).Assembly, typeof(JT_Estoque.Core.Entities.ProdutoEstoque).Assembly }">
+            AdditionalAssemblies="new[] { typeof(MainLayout).Assembly }">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
                 <NotAuthorized>
