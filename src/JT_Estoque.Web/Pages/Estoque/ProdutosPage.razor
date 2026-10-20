@@ -1,0 +1,257 @@
+@page "/estoque/produtos"
+@using JT_Classes.Comum
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Services
+@using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Services.Interfaces.Comum
+@using JT_UserInterface.Shared.Templates
+@inject ProdutoEstoqueService ProdutoService
+@inject ICategoriaService CategoriaService
+
+<CrudPageTemplate PageTitle="Catálogo de Produtos & SKUs" PageIcon="bi-box-seam">
+    <PageDescription>
+        Gestão completa de itens estocáveis, fichas técnicas de SKU, ponto de pedido e custos médios ponderados.
+    </PageDescription>
+
+    <ToolbarLeft>
+        <button class="btn btn-primary shadow-sm" @onclick="() => modalProdutoRef?.Abrir()">
+            <i class="bi bi-plus-circle-fill me-1"></i>
+            <span>Novo Produto</span>
+        </button>
+
+        <div class="btn-group shadow-sm ms-2" role="group">
+            <button type="button" class="btn @(filtroSaude == "todos" ? "btn-secondary" : "btn-outline-secondary") btn-sm" @onclick='() => SetFiltroSaude("todos")'>
+                Todos (@produtos.Count)
+            </button>
+            <button type="button" class="btn @(filtroSaude == "criticos" ? "btn-danger" : "btn-outline-danger") btn-sm" @onclick='() => SetFiltroSaude("criticos")'>
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>Críticos (@produtos.Count(p => p.Ativo && p.QuantidadeEstoque <= p.EstoqueMinimo))
+            </button>
+            <button type="button" class="btn @(filtroSaude == "lotes" ? "btn-info text-white" : "btn-outline-info") btn-sm" @onclick='() => SetFiltroSaude("lotes")'>
+                Com Lote (@produtos.Count(p => p.ControlaLote))
+            </button>
+        </div>
+    </ToolbarLeft>
+
+    <ToolbarRight>
+        <div class="input-group input-group-sm" style="max-width: 280px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" placeholder="Buscar por SKU ou Nome..." @bind="termoPesquisa" @bind:event="oninput" />
+        </div>
+    </ToolbarRight>
+
+    <ChildContent>
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-2 text-muted">Carregando catálogo de produtos...</div>
+            </div>
+        }
+        else if (!ProdutosFiltrados.Any())
+        {
+            <div class="card p-5 text-center border-0 shadow-sm">
+                <i class="bi bi-box display-3 text-muted mb-3"></i>
+                <h5 class="fw-bold">Nenhum produto encontrado</h5>
+                <p class="text-muted">Não foram encontrados produtos com os critérios de busca selecionados.</p>
+                <div class="mt-2">
+                    <button class="btn btn-primary" @onclick="() => modalProdutoRef?.Abrir()">
+                        <i class="bi bi-plus-lg me-1"></i>Cadastrar Primeiro Produto
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card card-modern overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>SKU / EAN</th>
+                                <th>Nome do Produto</th>
+                                <th>Categoria</th>
+                                <th class="text-center">Saldo Atual</th>
+                                <th class="text-center">Saúde</th>
+                                <th class="text-end">Custo Médio</th>
+                                <th class="text-end">Preço Venda</th>
+                                <th class="text-end">Valor em Estoque</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in ProdutosFiltrados)
+                            {
+                                var cat = categorias.FirstOrDefault(c => c.Id == p.IdCategoria);
+                                decimal valorEstoque = p.QuantidadeEstoque * (p.CustoMedio > 0 ? p.CustoMedio : p.PrecoCusto);
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold font-monospace text-primary">@p.CodigoSKU</div>
+                                        @if (!string.IsNullOrEmpty(p.CodigoBarras))
+                                        {
+                                            <small class="text-muted"><i class="bi bi-upc me-1"></i>@p.CodigoBarras</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@p.Nome</div>
+                                        @if (!string.IsNullOrEmpty(p.LocalizacaoCorredor))
+                                        {
+                                            <small class="text-muted"><i class="bi bi-geo-alt me-1"></i>@p.LocalizacaoCorredor</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (cat != null)
+                                        {
+                                            <span class="badge bg-light text-dark border">@cat.Nome</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold">@p.QuantidadeEstoque.ToString("N2")</span>
+                                        <small class="text-muted ms-1">@p.UnidadeMedida</small>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (p.QuantidadeEstoque <= p.EstoqueMinimo)
+                                        {
+                                            <span class="health-pill health-critico">Crítico</span>
+                                        }
+                                        else if (p.QuantidadeEstoque <= p.PontoPedido)
+                                        {
+                                            <span class="health-pill health-alerta">Ponto Pedido</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="health-pill health-normal">Normal</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @p.CustoMedio.ToString("C2")
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        @p.Preco.ToString("C2")
+                                    </td>
+                                    <td class="text-end fw-bold text-indigo">
+                                        @valorEstoque.ToString("C2")
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-success" title="Lançar Movimentação" @onclick="() => modalMovimentacaoRef?.Abrir(p.Id)">
+                                                <i class="bi bi-arrow-left-right"></i>
+                                            </button>
+                                            <button class="btn btn-outline-primary" title="Editar Produto" @onclick="() => modalProdutoRef?.Abrir(p)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" title="Excluir Produto" @onclick="() => SolicitarExclusao(p)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </ChildContent>
+
+    <Modals>
+        <ModalProdutoEstoque @ref="modalProdutoRef" OnSaved="CarregarProdutosAsync" />
+        <ModalNovaMovimentacao @ref="modalMovimentacaoRef" OnSaved="CarregarProdutosAsync" />
+        <ConfirmDialog @ref="confirmDeleteDialog" OnConfirm="ExcluirProduto" />
+    </Modals>
+</CrudPageTemplate>
+
+@code {
+    private bool isLoading = true;
+    private List<ProdutoEstoque> produtos = [];
+    private List<JT_Classes.structs.sCategoria> categorias = [];
+
+    private string termoPesquisa = string.Empty;
+    private string filtroSaude = "todos";
+
+    private ProdutoEstoque? produtoParaExcluir;
+
+    private ModalProdutoEstoque? modalProdutoRef;
+    private ModalNovaMovimentacao? modalMovimentacaoRef;
+    private ConfirmDialog? confirmDeleteDialog;
+
+    private IEnumerable<ProdutoEstoque> ProdutosFiltrados
+    {
+        get
+        {
+            var query = produtos.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(termoPesquisa))
+            {
+                query = query.Where(p =>
+                    (p.Nome?.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (p.CodigoSKU?.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (p.CodigoBarras?.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            if (filtroSaude == "criticos")
+            {
+                query = query.Where(p => p.Ativo && p.QuantidadeEstoque <= p.EstoqueMinimo);
+            }
+            else if (filtroSaude == "lotes")
+            {
+                query = query.Where(p => p.ControlaLote);
+            }
+
+            return query.OrderBy(p => p.Nome);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarProdutosAsync();
+    }
+
+    private async Task CarregarProdutosAsync()
+    {
+        try
+        {
+            isLoading = true;
+            produtos = await ProdutoService.GetAll();
+            categorias = await CategoriaService.ObterTodasCategoriasAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar produtos: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SetFiltroSaude(string filtro)
+    {
+        filtroSaude = filtro;
+    }
+
+    private void SolicitarExclusao(ProdutoEstoque produto)
+    {
+        produtoParaExcluir = produto;
+        confirmDeleteDialog?.Show(
+            "Excluir Produto",
+            $"Tem certeza que deseja excluir o produto '{produto.Nome}' ({produto.CodigoSKU})? Esta ação não pode ser desfeita.",
+            "Excluir",
+            "Cancelar"
+        );
+    }
+
+    private async Task ExcluirProduto()
+    {
+        if (produtoParaExcluir != null)
+        {
+            await ProdutoService.Delete(produtoParaExcluir.Id);
+            produtoParaExcluir = null;
+            await CarregarProdutosAsync();
+        }
+    }
+}

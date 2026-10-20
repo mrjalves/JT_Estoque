@@ -1,0 +1,101 @@
+name: Deploy Estoque
+
+on:  
+  push:    
+    branches: [main, master]  
+  workflow_dispatch:
+
+concurrency:  
+  group: deploy-estoque  
+  cancel-in-progress: false
+
+env:  
+  PROJECT: src/JT_Estoque.Web/JT_Estoque.Web.csproj  
+  SERVICE: jt_sistemas_estoque  
+  DEST: /var/www/jt_sistemas_estoque  
+  DOTNET: 10.0.x
+
+jobs:  
+  deploy:    
+    runs-on: ubuntu-latest    
+    steps:
+      # 1. Faz o checkout do repositório principal (JT_Estoque)
+      - name: Checkout JT_Estoque
+        uses: actions/checkout@v4
+
+      # 2. Faz o checkout do repositório secundário (JT_ApplicationLayer)
+      - name: Checkout JT_ApplicationLayer
+        uses: actions/checkout@v4
+        with:
+          repository: mrjalves/JT_ApplicationLayer
+          token: ${{ secrets.GH_PAT }}
+          path: JT_ApplicationLayer
+          ref: Master
+
+      # 3. Prepara o JT_ApplicationLayer no caminho irmão (sibling) para resolver os caminhos relativos
+      - name: Prepare JT_ApplicationLayer sibling path
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
+          mv "$GITHUB_WORKSPACE/JT_ApplicationLayer" "$GITHUB_WORKSPACE/../JT_ApplicationLayer"
+          # Garantir namespaces explícitos em componentes Razor modulares se ausentes
+          for f in "$GITHUB_WORKSPACE/../JT_ApplicationLayer/JT_UserInterface.Shared/Components"/*/*.razor; do
+            [ -f "$f" ] || continue
+            dir=$(basename "$(dirname "$f")")
+            if ! grep -q "@namespace" "$f"; then
+              sed -i "1s/^/@namespace JT_UserInterface.Shared.Components.$dir\n/" "$f"
+            fi
+          done
+
+      # 4. Configura a versão do .NET para a compilação
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET }}
+
+      # 5. Publica a aplicação gerando os arquivos de release
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT }} -c Release -o ./publish -p:ErrorOnDuplicatePublishOutputFiles=false
+
+      # 6. Configura a chave SSH para comunicar com o servidor Linux (VPS)
+      - name: Configurar SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 10 -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          test -s ~/.ssh/known_hosts
+
+      # 7. Sincroniza os arquivos compilados com o servidor usando rsync
+      - name: Enviar arquivos para a VPS
+        run: |
+          rsync -az --delete \
+            --exclude '/appsettings.json' \
+            --exclude '/appsettings.Production.json' \
+            --exclude '*.db' \
+            --exclude '*.db-shm' \
+            --exclude '*.db-wal' \
+            --exclude 'uploads/' \
+            -e "ssh -p ${{ secrets.VPS_PORT }}" \
+            ./publish/ \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH || env.DEST }}/
+
+      # 8. Reinicia o serviço systemd na VPS e valida se está ativo
+      - name: Reiniciar e verificar serviço
+        run: |
+          ssh -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'EOF'
+          set -e
+          sudo systemctl restart ${{ env.SERVICE }}
+          sleep 5
+          if ! systemctl is-active --quiet ${{ env.SERVICE }}; then
+            echo "::error::Serviço ${{ env.SERVICE }} não subiu"
+            journalctl -u ${{ env.SERVICE }} -n 50 --no-pager
+            exit 1
+          fi
+          echo "Serviço ativo. Logs de inicialização/migração:"
+          journalctl -u ${{ env.SERVICE }} -n 30 --no-pager | grep -A5 MIGRACAO || true
+          EOF

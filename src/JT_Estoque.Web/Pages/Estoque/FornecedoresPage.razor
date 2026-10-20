@@ -1,0 +1,297 @@
+@page "/estoque/fornecedores"
+@using JT_Classes.CRM
+@using JT_Classes.Comum
+@using JT_Servicos.CRM
+@using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Templates
+@using static JT_UserInterface.Shared.Components.Core.Modal
+@inject FornecedorService FornecedorService
+
+<CrudPageTemplate PageTitle="Gestão de Fornecedores" PageIcon="bi-truck">
+    <PageDescription>
+        Cadastro centralizado de fornecedores, fabricantes e distribuidores homologados para reposição de estoque.
+    </PageDescription>
+
+    <ToolbarLeft>
+        <button class="btn btn-primary shadow-sm" @onclick="AbrirModalNovo">
+            <i class="bi bi-plus-circle-fill me-1"></i>
+            <span>Novo Fornecedor</span>
+        </button>
+    </ToolbarLeft>
+
+    <ToolbarRight>
+        <div class="input-group input-group-sm" style="max-width: 260px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" placeholder="Buscar fornecedor..." @bind="termoPesquisa" @bind:event="oninput" />
+        </div>
+    </ToolbarRight>
+
+    <ChildContent>
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-2 text-muted">Carregando fornecedores...</div>
+            </div>
+        }
+        else if (!FornecedoresFiltrados.Any())
+        {
+            <div class="card p-5 text-center border-0 shadow-sm">
+                <i class="bi bi-truck display-3 text-muted mb-3"></i>
+                <h5 class="fw-bold">Nenhum fornecedor cadastrado</h5>
+                <p class="text-muted">Cadastre os fornecedores para associá-los aos produtos e compras de estoque.</p>
+                <div class="mt-2">
+                    <button class="btn btn-primary" @onclick="AbrirModalNovo">
+                        <i class="bi bi-plus-lg me-1"></i>Cadastrar Primeiro Fornecedor
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card card-modern overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nome / Razão Social</th>
+                                <th>E-mail de Contato</th>
+                                <th>Telefone</th>
+                                <th>Data Cadastro</th>
+                                <th class="text-center">Status</th>
+                                <th>Observações</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var f in FornecedoresFiltrados)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">@f.Nome</div>
+                                        <small class="text-muted">ID: @f.Id</small>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(f.Email))
+                                        {
+                                            <a href="mailto:@f.Email" class="text-decoration-none">@f.Email</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @(!string.IsNullOrEmpty(f.Telefone) ? f.Telefone : "-")
+                                    </td>
+                                    <td class="small text-muted font-monospace">
+                                        @f.DataCadastro.ToString("dd/MM/yyyy")
+                                    </td>
+                                    <td class="text-center">
+                                        @if (f.Ativo)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border">Inativo</span>
+                                        }
+                                    </td>
+                                    <td class="small text-muted" style="max-width: 250px;">
+                                        @f.Observacoes
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" title="Editar" @onclick="() => AbrirModalEditar(f)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" title="Excluir" @onclick="() => SolicitarExclusao(f)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </ChildContent>
+
+    <Modals>
+        <!-- Modal de Cadastro / Edição de Fornecedor -->
+        <Modal @ref="modalFornecedorRef" Title="@(fornecedorAtual.Id == 0 ? "Novo Fornecedor" : $"Editar Fornecedor: {fornecedorAtual.Nome}")" Size="ModalSize.Default">
+            <BodyContent>
+                <EditForm Model="fornecedorAtual" OnValidSubmit="SalvarFornecedor">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Razão Social / Nome <span class="text-danger">*</span></label>
+                            <InputText class="form-control" placeholder="ex: Distribuidora Nacional de Peças Ltda" @bind-Value="fornecedorAtual.Nome" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">E-mail</label>
+                            <InputText class="form-control" type="email" placeholder="vendas@fornecedor.com.br" @bind-Value="fornecedorAtual.Email" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Telefone</label>
+                            <InputText class="form-control" placeholder="(11) 99999-9999" @bind-Value="fornecedorAtual.Telefone" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Observações / Condições Comerciais</label>
+                            <InputTextArea class="form-control" rows="2" placeholder="Prazo médio de entrega, faturamento..." @bind-Value="fornecedorAtual.Observacoes" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch mt-2">
+                                <InputCheckbox class="form-check-input" id="chkFornecedorAtivo" @bind-Value="fornecedorAtual.Ativo" />
+                                <label class="form-check-label fw-semibold" for="chkFornecedorAtivo">Fornecedor Ativo para Compras</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(mensagemErro))
+                    {
+                        <div class="alert alert-danger mt-3 py-2">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErro
+                        </div>
+                    }
+                </EditForm>
+            </BodyContent>
+            <FooterContent>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => modalFornecedorRef?.Close()">Cancelar</button>
+                <button type="button" class="btn btn-primary" @onclick="SalvarFornecedor" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Salvando...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check2-circle me-1"></i>
+                        <span>Salvar</span>
+                    }
+                </button>
+            </FooterContent>
+        </Modal>
+
+        <ConfirmDialog @ref="confirmDeleteDialog" OnConfirm="ExcluirFornecedor" />
+    </Modals>
+</CrudPageTemplate>
+
+@code {
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? mensagemErro;
+
+    private List<Fornecedor> fornecedores = [];
+    private string termoPesquisa = string.Empty;
+
+    private Fornecedor fornecedorAtual = new();
+    private Fornecedor? fornecedorParaExcluir;
+
+    private Modal? modalFornecedorRef;
+    private ConfirmDialog? confirmDeleteDialog;
+
+    private IEnumerable<Fornecedor> FornecedoresFiltrados
+    {
+        get
+        {
+            var query = fornecedores.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(termoPesquisa))
+            {
+                query = query.Where(f =>
+                    (f.Nome?.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (f.Email?.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+            return query.OrderBy(f => f.Nome);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarFornecedoresAsync();
+    }
+
+    private async Task CarregarFornecedoresAsync()
+    {
+        try
+        {
+            isLoading = true;
+            fornecedores = await FornecedorService.GetAll();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar fornecedores: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AbrirModalNovo()
+    {
+        fornecedorAtual = new Fornecedor { Ativo = true, DataCadastro = DateTime.Now };
+        mensagemErro = null;
+        isSaving = false;
+        modalFornecedorRef?.Open();
+    }
+
+    private void AbrirModalEditar(Fornecedor f)
+    {
+        fornecedorAtual = f;
+        mensagemErro = null;
+        isSaving = false;
+        modalFornecedorRef?.Open();
+    }
+
+    private async Task SalvarFornecedor()
+    {
+        if (string.IsNullOrWhiteSpace(fornecedorAtual.Nome))
+        {
+            mensagemErro = "Por favor informe a Razão Social ou Nome do fornecedor.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            mensagemErro = null;
+            await FornecedorService.SaveAsync(fornecedorAtual);
+            modalFornecedorRef?.Close();
+            await CarregarFornecedoresAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void SolicitarExclusao(Fornecedor f)
+    {
+        fornecedorParaExcluir = f;
+        confirmDeleteDialog?.Show(
+            "Excluir Fornecedor",
+            $"Tem certeza que deseja excluir o fornecedor '{f.Nome}'?",
+            "Excluir",
+            "Cancelar"
+        );
+    }
+
+    private async Task ExcluirFornecedor()
+    {
+        if (fornecedorParaExcluir != null)
+        {
+            await FornecedorService.Delete(fornecedorParaExcluir.Id);
+            fornecedorParaExcluir = null;
+            await CarregarFornecedoresAsync();
+        }
+    }
+}

@@ -1,0 +1,192 @@
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Enums
+@using JT_Estoque.Core.Services
+@using JT_UserInterface.Shared.Components.Core
+@using static JT_UserInterface.Shared.Components.Core.Modal
+@inject LoteEstoqueService LoteService
+@inject ProdutoEstoqueService ProdutoService
+@inject LocalEstoqueService LocalService
+
+<Modal @ref="modalRef" Title="@(Lote.Id == 0 ? "Novo Lote de Estoque" : $"Editar Lote: {Lote.CodigoLote}")" Size="ModalSize.Large">
+    <BodyContent>
+        <EditForm Model="Lote" OnValidSubmit="SalvarLote">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Produto <span class="text-danger">*</span></label>
+                    <InputSelect class="form-select" @bind-Value="Lote.ProdutoId">
+                        <option value="0">Selecione o produto...</option>
+                        @foreach (var p in produtos)
+                        {
+                            <option value="@p.Id">@p.Nome (@p.CodigoSKU)</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Almoxarifado <span class="text-danger">*</span></label>
+                    <InputSelect class="form-select" @bind-Value="Lote.LocalEstoqueId">
+                        <option value="0">Selecione o local...</option>
+                        @foreach (var l in locais)
+                        {
+                            <option value="@l.Id">@l.Nome (@l.Codigo)</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Identificador / Código do Lote <span class="text-danger">*</span></label>
+                    <InputText class="form-control" placeholder="ex: LOT-2026-X01" @bind-Value="Lote.CodigoLote" required />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Status do Lote</label>
+                    <InputSelect class="form-select" @bind-Value="Lote.StatusLote">
+                        <option value="@eStatusLote.Disponivel">Disponível para Movimentação</option>
+                        <option value="@eStatusLote.Quarentena">Em Quarentena / Inspeção</option>
+                        <option value="@eStatusLote.Bloqueado">Bloqueado / Restrito</option>
+                        <option value="@eStatusLote.Vencido">Vencido</option>
+                        <option value="@eStatusLote.Esgotado">Esgotado (Sem Saldo)</option>
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Data de Fabricação</label>
+                    <InputDate class="form-control" @bind-Value="Lote.DataFabricacao" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Data de Validade (FEFO)</label>
+                    <InputDate class="form-control" @bind-Value="Lote.DataValidade" />
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Quantidade Inicial</label>
+                    <InputNumber class="form-control" step="0.0001" @bind-Value="Lote.QuantidadeInicial" />
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Quantidade Saldo Atual</label>
+                    <InputNumber class="form-control fw-bold" step="0.0001" @bind-Value="Lote.QuantidadeSaldo" />
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Custo Unitário (R$)</label>
+                    <InputNumber class="form-control" step="0.01" @bind-Value="Lote.CustoUnitario" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(mensagemErro))
+            {
+                <div class="alert alert-danger mt-3 py-2">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErro
+                </div>
+            }
+        </EditForm>
+    </BodyContent>
+    <FooterContent>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Fechar">Cancelar</button>
+        <button type="button" class="btn btn-primary" @onclick="SalvarLote" disabled="@isSaving">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <i class="bi bi-check2-circle me-1"></i>
+                <span>Salvar Lote</span>
+            }
+        </button>
+    </FooterContent>
+</Modal>
+
+@code {
+    private Modal? modalRef;
+    private bool isSaving = false;
+    private string? mensagemErro;
+
+    private List<ProdutoEstoque> produtos = [];
+    private List<LocalEstoque> locais = [];
+
+    [Parameter] public LoteEstoque Lote { get; set; } = new();
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    public async Task Abrir(LoteEstoque? lote = null)
+    {
+        Lote = lote ?? new LoteEstoque
+        {
+            DataFabricacao = DateTime.Today,
+            DataValidade = DateTime.Today.AddMonths(12),
+            StatusLote = eStatusLote.Disponivel
+        };
+
+        mensagemErro = null;
+        isSaving = false;
+
+        try
+        {
+            produtos = await ProdutoService.GetAll();
+            locais = await LocalService.GetAll();
+
+            if (Lote.ProdutoId == 0 && produtos.Any())
+                Lote.ProdutoId = produtos.First().Id;
+
+            if (Lote.LocalEstoqueId == 0 && locais.Any())
+                Lote.LocalEstoqueId = locais.First().Id;
+        }
+        catch { }
+
+        modalRef?.Open();
+        StateHasChanged();
+    }
+
+    public void Fechar()
+    {
+        modalRef?.Close();
+    }
+
+    private async Task SalvarLote()
+    {
+        if (Lote.ProdutoId <= 0)
+        {
+            mensagemErro = "Selecione um produto para o lote.";
+            return;
+        }
+
+        if (Lote.LocalEstoqueId <= 0)
+        {
+            mensagemErro = "Selecione o almoxarifado.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Lote.CodigoLote))
+        {
+            mensagemErro = "Informe o código do lote.";
+            return;
+        }
+
+        if (Lote.Id == 0 && Lote.QuantidadeSaldo == 0 && Lote.QuantidadeInicial > 0)
+        {
+            Lote.QuantidadeSaldo = Lote.QuantidadeInicial;
+        }
+
+        try
+        {
+            isSaving = true;
+            mensagemErro = null;
+            await LoteService.SaveAsync(Lote);
+            Fechar();
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

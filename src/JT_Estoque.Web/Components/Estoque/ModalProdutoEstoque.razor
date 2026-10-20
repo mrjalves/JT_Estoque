@@ -1,0 +1,249 @@
+@using JT_Classes.CRM
+@using JT_Classes.Comum
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Services
+@using JT_Servicos.CRM
+@using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Services.Interfaces.Comum
+@using static JT_UserInterface.Shared.Components.Core.Modal
+@inject ProdutoEstoqueService ProdutoService
+@inject LocalEstoqueService LocalService
+@inject FornecedorService FornecedorService
+@inject ICategoriaService CategoriaService
+
+<Modal @ref="modalRef" Title="@(Produto.Id == 0 ? "Novo Produto / SKU" : $"Editar Produto: {Produto.Nome}")" Size="ModalSize.Large">
+    <BodyContent>
+        <EditForm Model="Produto" OnValidSubmit="SalvarProduto">
+            <DataAnnotationsValidator />
+
+            <TabControl>
+                <!-- ABA 1: DADOS GERAIS -->
+                <TabPage Title="Dados Gerais">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Nome do Produto <span class="text-danger">*</span></label>
+                            <InputText class="form-control" placeholder="ex: Teclado Mecânico RGB" @bind-Value="Produto.Nome" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Código SKU <span class="text-danger">*</span></label>
+                            <InputText class="form-control" placeholder="ex: TEC-MEC-001" @bind-Value="Produto.CodigoSKU" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Código de Barras (EAN/GTIN)</label>
+                            <InputText class="form-control" placeholder="789..." @bind-Value="Produto.CodigoBarras" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Unidade de Medida</label>
+                            <InputSelect class="form-select" @bind-Value="Produto.UnidadeMedida">
+                                <option value="UN">UN - Unidade</option>
+                                <option value="CX">CX - Caixa</option>
+                                <option value="KG">KG - Quilograma</option>
+                                <option value="LT">LT - Litro</option>
+                                <option value="MT">MT - Metro</option>
+                                <option value="PC">PC - Peça</option>
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Categoria</label>
+                            <InputSelect class="form-select" @bind-Value="Produto.IdCategoria">
+                                <option value="">(Sem categoria)</option>
+                                @foreach (var cat in categorias)
+                                {
+                                    <option value="@cat.Id">@cat.Nome</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Descrição Detalhada</label>
+                            <InputTextArea class="form-control" rows="2" placeholder="Especificações técnicas, dimensões..." @bind-Value="Produto.Descricao" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch mt-2">
+                                <InputCheckbox class="form-check-input" id="chkProdutoAtivo" @bind-Value="Produto.Ativo" />
+                                <label class="form-check-label fw-semibold" for="chkProdutoAtivo">Produto Ativo no Catálogo</label>
+                            </div>
+                        </div>
+                    </div>
+                </TabPage>
+
+                <!-- ABA 2: ESTOQUE E CUSTOS -->
+                <TabPage Title="Estoque & Custos">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Preço de Venda (R$)</label>
+                            <InputNumber class="form-control" step="0.01" @bind-Value="Produto.Preco" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Último Preço de Custo (R$)</label>
+                            <InputNumber class="form-control" step="0.01" @bind-Value="Produto.PrecoCusto" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Custo Médio Ponderado (CMP)</label>
+                            <input type="text" class="form-control bg-light" readonly value="@Produto.CustoMedio.ToString("C2")" />
+                            <small class="text-muted">Calculado automaticamente no Kardex</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Estoque Mínimo</label>
+                            <InputNumber class="form-control" step="1" @bind-Value="Produto.EstoqueMinimo" />
+                            <small class="text-muted">Gera alerta de ruptura</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Ponto de Pedido</label>
+                            <InputNumber class="form-control" step="1" @bind-Value="Produto.PontoPedido" />
+                            <small class="text-muted">Momento ideal de compra</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Estoque Máximo</label>
+                            <InputNumber class="form-control" step="1" @bind-Value="Produto.EstoqueMaximo" />
+                        </div>
+                        @if (Produto.Id == 0)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Saldo Inicial em Estoque</label>
+                                <InputNumber class="form-control" step="1" @bind-Value="Produto.QuantidadeEstoque" />
+                                <small class="text-muted">Saldo de abertura</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Saldo Atual em Estoque</label>
+                                <input type="text" class="form-control bg-light fw-bold" readonly value="@Produto.QuantidadeEstoque.ToString("N2")" />
+                                <small class="text-muted">Movimentações devem ser feitas via Kardex</small>
+                            </div>
+                        }
+                    </div>
+                </TabPage>
+
+                <!-- ABA 3: LOGÍSTICA E LOTE -->
+                <TabPage Title="Logística & Rastreabilidade">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Fornecedor Padrão</label>
+                            <InputSelect class="form-select" @bind-Value="Produto.FornecedorPadraoId">
+                                <option value="">(Nenhum selecionado)</option>
+                                @foreach (var f in fornecedores)
+                                {
+                                    <option value="@f.Id">@f.Nome</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Almoxarifado Padrão</label>
+                            <InputSelect class="form-select" @bind-Value="Produto.LocalPadraoId">
+                                <option value="">(Nenhum selecionado)</option>
+                                @foreach (var loc in locais)
+                                {
+                                    <option value="@loc.Id">@loc.Nome (@loc.Codigo)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Endereço no Depósito / Corredor</label>
+                            <InputText class="form-control" placeholder="ex: Corredor B - Prateleira 3 - Vão 04" @bind-Value="Produto.LocalizacaoCorredor" />
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card p-3 bg-light border-0">
+                                <div class="form-check form-switch mb-2">
+                                    <InputCheckbox class="form-check-input" id="chkControlaLote" @bind-Value="Produto.ControlaLote" />
+                                    <label class="form-check-label fw-semibold" for="chkControlaLote">Exigir Controle de Lotes</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <InputCheckbox class="form-check-input" id="chkControlaValidade" @bind-Value="Produto.ControlaValidade" />
+                                    <label class="form-check-label fw-semibold" for="chkControlaValidade">Exigir Controle de Validade (FEFO)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </TabPage>
+            </TabControl>
+
+            @if (!string.IsNullOrEmpty(mensagemErro))
+            {
+                <div class="alert alert-danger mt-3 py-2">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErro
+                </div>
+            }
+        </EditForm>
+    </BodyContent>
+    <FooterContent>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Fechar">Cancelar</button>
+        <button type="button" class="btn btn-primary" @onclick="SalvarProduto" disabled="@isSaving">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <i class="bi bi-check2-circle me-1"></i>
+                <span>Salvar Produto</span>
+            }
+        </button>
+    </FooterContent>
+</Modal>
+
+@code {
+    private Modal? modalRef;
+    private bool isSaving = false;
+    private string? mensagemErro;
+
+    private List<JT_Classes.structs.sCategoria> categorias = [];
+    private List<Fornecedor> fornecedores = [];
+    private List<LocalEstoque> locais = [];
+
+    [Parameter] public ProdutoEstoque Produto { get; set; } = new();
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    public async Task Abrir(ProdutoEstoque? produto = null)
+    {
+        Produto = produto ?? new ProdutoEstoque { Ativo = true, UnidadeMedida = "UN" };
+        mensagemErro = null;
+        isSaving = false;
+
+        try
+        {
+            categorias = await CategoriaService.ObterTodasCategoriasAsync();
+            fornecedores = await FornecedorService.GetAll();
+            locais = await LocalService.GetAll();
+        }
+        catch
+        {
+            // Tratamento silencioso caso o backend não esteja ativo
+        }
+
+        modalRef?.Open();
+        StateHasChanged();
+    }
+
+    public void Fechar()
+    {
+        modalRef?.Close();
+    }
+
+    private async Task SalvarProduto()
+    {
+        if (string.IsNullOrWhiteSpace(Produto.Nome) || string.IsNullOrWhiteSpace(Produto.CodigoSKU))
+        {
+            mensagemErro = "Por favor preencha o Nome e o Código SKU do produto.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            mensagemErro = null;
+            await ProdutoService.SaveAsync(Produto);
+            Fechar();
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

@@ -1,0 +1,388 @@
+@page "/estoque/dashboard"
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Enums
+@using JT_Estoque.Core.Services
+@using JT_UserInterface.Shared.Components.Core.Charts
+@inject ProdutoEstoqueService ProdutoService
+@inject MovimentacaoEstoqueService MovimentacaoService
+@inject LoteEstoqueService LoteService
+@inject LocalEstoqueService LocalService
+
+<div class="container-fluid py-4">
+    <!-- Header com Título e Ações Rápidas -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <h2 class="fw-bold mb-1 d-flex align-items-center gap-2">
+                <i class="bi bi-speedometer2 text-primary"></i>
+                Dashboard de Estoque & Logística
+            </h2>
+            <p class="text-muted mb-0">Visão panorâmica de saldos, rupturas, validade de lotes e giro de almoxarifados.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary rounded-pill px-3 shadow-sm" @onclick="() => modalProdutoRef?.Abrir()">
+                <i class="bi bi-plus-circle me-1"></i> Novo Produto
+            </button>
+            <button class="btn btn-primary rounded-pill px-4 shadow-sm" @onclick="() => modalMovimentacaoRef?.Abrir()">
+                <i class="bi bi-arrow-left-right me-1"></i> Nova Movimentação (Kardex)
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center align-items-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando indicadores...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- KPI CARDS -->
+        <div class="row g-3 mb-4">
+            <!-- Valor Total -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="kpi-card kpi-primary h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="kpi-label">VALOR TOTAL EM ESTOQUE</div>
+                        <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+                    </div>
+                    <div class="kpi-value text-indigo">@valorTotalEstoque.ToString("C2")</div>
+                    <div class="small text-muted mt-2">
+                        <i class="bi bi-box-seam me-1"></i> @totalProdutosCadastrados produtos cadastrados
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rupturas / Críticos -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="kpi-card @(produtosCriticos.Count > 0 ? "kpi-danger" : "kpi-success") h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="kpi-label">PRODUTOS EM RUPTURA</div>
+                        <div class="kpi-icon"><i class="bi bi-exclamation-octagon"></i></div>
+                    </div>
+                    <div class="kpi-value @(produtosCriticos.Count > 0 ? "text-danger" : "text-success")">
+                        @produtosCriticos.Count
+                    </div>
+                    <div class="small @(produtosCriticos.Count > 0 ? "text-danger fw-semibold" : "text-muted") mt-2">
+                        @(produtosCriticos.Count > 0 ? "Abaixo do estoque mínimo estipulado" : "Nenhum produto em ruptura")
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lotes a Vencer (30 dias) -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="kpi-card @(lotesCriticos.Count > 0 ? "kpi-warning" : "kpi-primary") h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="kpi-label">LOTES A VENCER (30 DIAS)</div>
+                        <div class="kpi-icon"><i class="bi bi-calendar2-range"></i></div>
+                    </div>
+                    <div class="kpi-value text-warning">@lotesCriticos.Count</div>
+                    <div class="small text-muted mt-2">
+                        <i class="bi bi-arrow-repeat me-1"></i> Rastreabilidade e controle FEFO
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quantidade Física de Unidades -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="kpi-card kpi-success h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="kpi-label">VOLUME TOTAL EM SALDO</div>
+                        <div class="kpi-icon"><i class="bi bi-boxes"></i></div>
+                    </div>
+                    <div class="kpi-value text-success">@quantidadeFisicaTotal.ToString("N0")</div>
+                    <div class="small text-muted mt-2">
+                        <i class="bi bi-building me-1"></i> @totalAlmoxarifados almoxarifados ativos
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GRÁFICOS ANALÍTICOS -->
+        <div class="row g-4 mb-4">
+            <!-- Top Produtos por Valor em Estoque -->
+            <div class="col-12 col-lg-7">
+                <div class="card-modern p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Curva ABC - Maiores Ativos em Estoque</h5>
+                        <span class="badge bg-light text-dark border">Top 5 SKUs</span>
+                    </div>
+                    @if (chartTopProdutosDatasets.Any())
+                    {
+                        <Chart ChartId="chartTopProdutos"
+                               Type="ChartType.Bar"
+                               Labels="@chartTopProdutosLabels"
+                               Datasets="@chartTopProdutosDatasets"
+                               Title="Valor por Produto" />
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox display-4 mb-2 d-block"></i>
+                            Cadastre produtos para visualizar o gráfico de valor em estoque.
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Movimentações por Tipo -->
+            <div class="col-12 col-lg-5">
+                <div class="card-modern p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Distribuição de Movimentações</h5>
+                        <span class="badge bg-light text-dark border">Kardex</span>
+                    </div>
+                    @if (chartMovimentacoesDatasets.Any())
+                    {
+                        <Chart ChartId="chartTiposMovimentacao"
+                               Type="ChartType.Doughnut"
+                               Labels="@chartMovimentacoesLabels"
+                               Datasets="@chartMovimentacoesDatasets"
+                               Title="Operações" />
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox display-4 mb-2 d-block"></i>
+                            Nenhuma movimentação realizada até o momento.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- TABELAS DE AÇÃO RÁPIDA -->
+        <div class="row g-4">
+            <!-- Produtos Críticos para Reposição -->
+            <div class="col-12 col-lg-6">
+                <div class="card-modern p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0 text-danger">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>Alertas de Reposição Imediata
+                        </h5>
+                        <a href="/estoque/produtos" class="btn btn-sm btn-outline-secondary">Ver Catálogo</a>
+                    </div>
+                    @if (!produtosCriticos.Any())
+                    {
+                        <div class="alert alert-success py-3 mb-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>Todos os produtos ativos estão com saldo acima do estoque mínimo!
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>SKU / Produto</th>
+                                        <th class="text-center">Saldo Atual</th>
+                                        <th class="text-center">Mínimo</th>
+                                        <th class="text-center">Déficit</th>
+                                        <th class="text-end">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var p in produtosCriticos.Take(5))
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="fw-bold">@p.Nome</div>
+                                                <small class="text-muted">@p.CodigoSKU</small>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-danger">@p.QuantidadeEstoque @p.UnidadeMedida</span>
+                                            </td>
+                                            <td class="text-center text-muted">@p.EstoqueMinimo</td>
+                                            <td class="text-center text-danger fw-bold">
+                                                -@((p.EstoqueMinimo - p.QuantidadeEstoque).ToString("N0"))
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" title="Lançar Entrada de Compra" @onclick="() => modalMovimentacaoRef?.Abrir(p.Id)">
+                                                    <i class="bi bi-plus-lg"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Últimas Movimentações do Kardex -->
+            <div class="col-12 col-lg-6">
+                <div class="card-modern p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0">
+                            <i class="bi bi-clock-history text-primary me-2"></i>Últimos Lançamentos no Kardex
+                        </h5>
+                        <a href="/estoque/movimentacoes" class="btn btn-sm btn-outline-secondary">Ver Extrato Completo</a>
+                    </div>
+                    @if (!ultimasMovimentacoes.Any())
+                    {
+                        <div class="text-center py-4 text-muted">
+                            Nenhum lançamento recente encontrado.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Data/Hora</th>
+                                        <th>Tipo</th>
+                                        <th>Produto</th>
+                                        <th class="text-end">Qtd</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var m in ultimasMovimentacoes.Take(5))
+                                    {
+                                        var prod = produtos.FirstOrDefault(x => x.Id == m.ProdutoId);
+                                        <tr>
+                                            <td class="small text-muted">@m.DataMovimentacao.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>
+                                                <span class="badge @ObterClasseBadgeMovimentacao(m.TipoMovimentacao)">
+                                                    @m.TipoMovimentacao
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold">@(prod?.Nome ?? $"ID {m.ProdutoId}")</div>
+                                            </td>
+                                            <td class="text-end fw-bold">
+                                                @(EhTipoEntrada(m.TipoMovimentacao) ? "+" : "-")@m.Quantidade.ToString("N2")
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Modais -->
+<ModalProdutoEstoque @ref="modalProdutoRef" OnSaved="CarregarDadosAsync" />
+<ModalNovaMovimentacao @ref="modalMovimentacaoRef" OnSaved="CarregarDadosAsync" />
+
+@code {
+    private bool isLoading = true;
+
+    private List<ProdutoEstoque> produtos = [];
+    private List<MovimentacaoEstoque> ultimasMovimentacoes = [];
+    private List<LoteEstoque> lotes = [];
+    private List<LoteEstoque> lotesCriticos = [];
+    private List<ProdutoEstoque> produtosCriticos = [];
+
+    private decimal valorTotalEstoque = 0;
+    private decimal quantidadeFisicaTotal = 0;
+    private int totalProdutosCadastrados = 0;
+    private int totalAlmoxarifados = 0;
+
+    // Charts
+    private List<string> chartTopProdutosLabels = [];
+    private List<ChartDataset> chartTopProdutosDatasets = [];
+    private List<string> chartMovimentacoesLabels = [];
+    private List<ChartDataset> chartMovimentacoesDatasets = [];
+
+    private ModalProdutoEstoque? modalProdutoRef;
+    private ModalNovaMovimentacao? modalMovimentacaoRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDadosAsync();
+    }
+
+    private async Task CarregarDadosAsync()
+    {
+        try
+        {
+            isLoading = true;
+
+            produtos = await ProdutoService.GetAll();
+            ultimasMovimentacoes = (await MovimentacaoService.GetAll()).OrderByDescending(m => m.DataMovimentacao).ToList();
+            lotes = await LoteService.GetAll();
+            var locais = await LocalService.GetAll();
+
+            totalProdutosCadastrados = produtos.Count;
+            totalAlmoxarifados = locais.Count;
+
+            // Cálculos de KPIs
+            valorTotalEstoque = produtos.Where(p => p.Ativo).Sum(p => p.QuantidadeEstoque * (p.CustoMedio > 0 ? p.CustoMedio : p.PrecoCusto));
+            quantidadeFisicaTotal = produtos.Where(p => p.Ativo).Sum(p => p.QuantidadeEstoque);
+            produtosCriticos = produtos.Where(p => p.Ativo && p.QuantidadeEstoque <= p.EstoqueMinimo).ToList();
+            lotesCriticos = await LoteService.ObterLotesAVencerAsync(30);
+
+            // Preparação dos Gráficos
+            PrepararGraficos();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar dados do dashboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void PrepararGraficos()
+    {
+        // 1. Top 5 Produtos por Valor
+        var top5 = produtos
+            .Where(p => p.Ativo && p.QuantidadeEstoque > 0)
+            .OrderByDescending(p => p.QuantidadeEstoque * (p.CustoMedio > 0 ? p.CustoMedio : p.PrecoCusto))
+            .Take(5)
+            .ToList();
+
+        chartTopProdutosLabels = top5.Select(p => p.Nome.Length > 15 ? p.Nome.Substring(0, 15) + "..." : p.Nome).ToList();
+        chartTopProdutosDatasets =
+        [
+            new ChartDataset
+            {
+                Label = "Valor em Estoque (R$)",
+                Data = top5.Select(p => p.QuantidadeEstoque * (p.CustoMedio > 0 ? p.CustoMedio : p.PrecoCusto)).ToList(),
+                BackgroundColor = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#ec4899"]
+            }
+        ];
+
+        // 2. Movimentações por Tipo
+        var tiposAgrupados = ultimasMovimentacoes
+            .GroupBy(m => m.TipoMovimentacao)
+            .Select(g => new { Tipo = g.Key.ToString(), Total = (decimal)g.Count() })
+            .ToList();
+
+        if (tiposAgrupados.Any())
+        {
+            chartMovimentacoesLabels = tiposAgrupados.Select(t => t.Tipo).ToList();
+            chartMovimentacoesDatasets =
+            [
+                new ChartDataset
+                {
+                    Label = "Total de Lançamentos",
+                    Data = tiposAgrupados.Select(t => t.Total).ToList(),
+                    BackgroundColor = ["#10b981", "#ef4444", "#f97316", "#0284c7", "#8b5cf6"]
+                }
+            ];
+        }
+    }
+
+    private bool EhTipoEntrada(eTipoMovimentacaoEstoque tipo) =>
+        tipo is eTipoMovimentacaoEstoque.EntradaCompra or eTipoMovimentacaoEstoque.TransferenciaEntrada
+            or eTipoMovimentacaoEstoque.AjusteInventarioPositivo or eTipoMovimentacaoEstoque.DevolucaoCliente;
+
+    private string ObterClasseBadgeMovimentacao(eTipoMovimentacaoEstoque tipo) => tipo switch
+    {
+        eTipoMovimentacaoEstoque.EntradaCompra or eTipoMovimentacaoEstoque.TransferenciaEntrada or eTipoMovimentacaoEstoque.DevolucaoCliente => "badge-mov-entrada",
+        eTipoMovimentacaoEstoque.SaidaVenda or eTipoMovimentacaoEstoque.SaidaConsumoInterno or eTipoMovimentacaoEstoque.DevolucaoFornecedor => "badge-mov-saida",
+        eTipoMovimentacaoEstoque.TransferenciaSaida => "badge-mov-transf",
+        _ => "badge-mov-ajuste"
+    };
+}

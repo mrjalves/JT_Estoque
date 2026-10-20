@@ -1,0 +1,267 @@
+@page "/estoque/lotes"
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Enums
+@using JT_Estoque.Core.Services
+@using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Templates
+@inject LoteEstoqueService LoteService
+@inject ProdutoEstoqueService ProdutoService
+@inject LocalEstoqueService LocalService
+
+<CrudPageTemplate PageTitle="Controle de Lotes & Validades (FEFO)" PageIcon="bi-calendar2-check">
+    <PageDescription>
+        Rastreabilidade de lotes, datas de fabricação, controle de perecíveis e quarentena de produtos avariados.
+    </PageDescription>
+
+    <ToolbarLeft>
+        <button class="btn btn-primary shadow-sm" @onclick="() => modalLoteRef?.Abrir()">
+            <i class="bi bi-plus-circle-fill me-1"></i>
+            <span>Novo Lote</span>
+        </button>
+
+        <div class="btn-group shadow-sm ms-2" role="group">
+            <button type="button" class="btn @(filtroStatus == "todos" ? "btn-secondary" : "btn-outline-secondary") btn-sm" @onclick='() => filtroStatus = "todos"'>
+                Todos (@lotes.Count)
+            </button>
+            <button type="button" class="btn @(filtroStatus == "vencer" ? "btn-warning" : "btn-outline-warning") btn-sm" @onclick='() => filtroStatus = "vencer"'>
+                <i class="bi bi-alarm-fill me-1"></i>A Vencer (30d) (@lotes.Count(l => l.DataValidade.HasValue && l.DataValidade.Value.Date <= DateTime.Today.AddDays(30) && l.DataValidade.Value.Date >= DateTime.Today))
+            </button>
+            <button type="button" class="btn @(filtroStatus == "vencidos" ? "btn-danger" : "btn-outline-danger") btn-sm" @onclick='() => filtroStatus = "vencidos"'>
+                <i class="bi bi-x-octagon-fill me-1"></i>Vencidos (@lotes.Count(l => l.StatusLote == eStatusLote.Vencido || (l.DataValidade.HasValue && l.DataValidade.Value.Date < DateTime.Today)))
+            </button>
+            <button type="button" class="btn @(filtroStatus == "quarentena" ? "btn-info text-white" : "btn-outline-info") btn-sm" @onclick='() => filtroStatus = "quarentena"'>
+                Quarentena (@lotes.Count(l => l.StatusLote == eStatusLote.Quarentena))
+            </button>
+        </div>
+    </ToolbarLeft>
+
+    <ToolbarRight>
+        <div class="input-group input-group-sm" style="max-width: 250px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" placeholder="Buscar código do lote..." @bind="termoPesquisa" @bind:event="oninput" />
+        </div>
+    </ToolbarRight>
+
+    <ChildContent>
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-2 text-muted">Carregando lotes cadastrados...</div>
+            </div>
+        }
+        else if (!LotesFiltrados.Any())
+        {
+            <div class="card p-5 text-center border-0 shadow-sm">
+                <i class="bi bi-calendar2-x display-3 text-muted mb-3"></i>
+                <h5 class="fw-bold">Nenhum lote encontrado</h5>
+                <p class="text-muted">Não há lotes registrados correspondentes ao filtro atual.</p>
+                <div class="mt-2">
+                    <button class="btn btn-primary" @onclick="() => modalLoteRef?.Abrir()">
+                        <i class="bi bi-plus-lg me-1"></i>Cadastrar Primeiro Lote
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card card-modern overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Código do Lote</th>
+                                <th>Produto Vinculado</th>
+                                <th>Almoxarifado</th>
+                                <th>Fabricação</th>
+                                <th>Validade (FEFO)</th>
+                                <th class="text-center">Saldo / Inicial</th>
+                                <th class="text-end">Custo Unitário</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lote in LotesFiltrados)
+                            {
+                                var prod = produtos.FirstOrDefault(p => p.Id == lote.ProdutoId);
+                                var local = locais.FirstOrDefault(l => l.Id == lote.LocalEstoqueId);
+                                bool vencido = lote.DataValidade.HasValue && lote.DataValidade.Value.Date < DateTime.Today;
+                                int? diasParaVencer = lote.DataValidade.HasValue ? (int)(lote.DataValidade.Value.Date - DateTime.Today).TotalDays : null;
+
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold font-monospace text-primary">@lote.CodigoLote</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@(prod?.Nome ?? $"Produto #{lote.ProdutoId}")</div>
+                                        <small class="text-muted font-monospace">@(prod?.CodigoSKU ?? "")</small>
+                                    </td>
+                                    <td>
+                                        <div>@(local?.Nome ?? $"Local #{lote.LocalEstoqueId}")</div>
+                                    </td>
+                                    <td class="small text-muted">
+                                        @(lote.DataFabricacao?.ToString("dd/MM/yyyy") ?? "-")
+                                    </td>
+                                    <td>
+                                        @if (lote.DataValidade.HasValue)
+                                        {
+                                            <div class="fw-semibold @(vencido ? "text-danger" : diasParaVencer <= 30 ? "text-warning" : "")">
+                                                @lote.DataValidade.Value.ToString("dd/MM/yyyy")
+                                            </div>
+                                            <small class="@(vencido ? "text-danger fw-bold" : "text-muted")">
+                                                @(vencido ? $"Vencido há {Math.Abs(diasParaVencer!.Value)} dias" : $"{diasParaVencer} dias restantes")
+                                            </small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">Não definida</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold fs-6">@lote.QuantidadeSaldo.ToString("N2")</span>
+                                        <span class="text-muted small"> / @lote.QuantidadeInicial.ToString("N2")</span>
+                                    </td>
+                                    <td class="text-end">
+                                        @(lote.CustoUnitario > 0 ? lote.CustoUnitario.ToString("C2") : "-")
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge-status @ObterBadgeStatusClass(lote.StatusLote, vencido)">
+                                            @if (vencido)
+                                            {
+                                                <i class="bi bi-exclamation-circle-fill"></i>
+                                                <span>Vencido</span>
+                                            }
+                                            else
+                                            {
+                                                @lote.StatusLote
+                                            }
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" title="Editar Lote" @onclick="() => modalLoteRef?.Abrir(lote)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" title="Excluir Lote" @onclick="() => SolicitarExclusao(lote)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </ChildContent>
+
+    <Modals>
+        <ModalLoteEstoque @ref="modalLoteRef" OnSaved="CarregarLotesAsync" />
+        <ConfirmDialog @ref="confirmDeleteDialog" OnConfirm="ExcluirLote" />
+    </Modals>
+</CrudPageTemplate>
+
+@code {
+    private bool isLoading = true;
+    private List<LoteEstoque> lotes = [];
+    private List<ProdutoEstoque> produtos = [];
+    private List<LocalEstoque> locais = [];
+
+    private string termoPesquisa = string.Empty;
+    private string filtroStatus = "todos";
+
+    private LoteEstoque? loteParaExcluir;
+
+    private ModalLoteEstoque? modalLoteRef;
+    private ConfirmDialog? confirmDeleteDialog;
+
+    private IEnumerable<LoteEstoque> LotesFiltrados
+    {
+        get
+        {
+            var query = lotes.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(termoPesquisa))
+            {
+                query = query.Where(l => l.CodigoLote.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (filtroStatus == "vencer")
+            {
+                var limite = DateTime.Today.AddDays(30);
+                query = query.Where(l => l.DataValidade.HasValue && l.DataValidade.Value.Date <= limite && l.DataValidade.Value.Date >= DateTime.Today);
+            }
+            else if (filtroStatus == "vencidos")
+            {
+                query = query.Where(l => l.StatusLote == eStatusLote.Vencido || (l.DataValidade.HasValue && l.DataValidade.Value.Date < DateTime.Today));
+            }
+            else if (filtroStatus == "quarentena")
+            {
+                query = query.Where(l => l.StatusLote == eStatusLote.Quarentena);
+            }
+
+            return query.OrderBy(l => l.DataValidade);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarLotesAsync();
+    }
+
+    private async Task CarregarLotesAsync()
+    {
+        try
+        {
+            isLoading = true;
+            lotes = await LoteService.GetAll();
+            produtos = await ProdutoService.GetAll();
+            locais = await LocalService.GetAll();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar lotes: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string ObterBadgeStatusClass(eStatusLote status, bool vencido)
+    {
+        if (vencido || status == eStatusLote.Vencido) return "badge-status-vencido";
+        return status switch
+        {
+            eStatusLote.Disponivel => "badge-status-disponivel",
+            eStatusLote.Quarentena => "badge-status-quarentena",
+            eStatusLote.Bloqueado => "badge-status-bloqueado",
+            eStatusLote.Esgotado => "badge-status-esgotado",
+            _ => "badge-status-disponivel"
+        };
+    }
+
+    private void SolicitarExclusao(LoteEstoque lote)
+    {
+        loteParaExcluir = lote;
+        confirmDeleteDialog?.Show(
+            "Excluir Lote",
+            $"Tem certeza que deseja excluir o lote '{lote.CodigoLote}'? Se houver movimentações vinculadas, esta exclusão pode ser impedida pelo banco.",
+            "Excluir",
+            "Cancelar"
+        );
+    }
+
+    private async Task ExcluirLote()
+    {
+        if (loteParaExcluir != null)
+        {
+            await LoteService.Delete(loteParaExcluir.Id);
+            loteParaExcluir = null;
+            await CarregarLotesAsync();
+        }
+    }
+}

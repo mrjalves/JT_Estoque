@@ -1,0 +1,111 @@
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Services
+@using JT_UserInterface.Shared.Components.Core
+@using static JT_UserInterface.Shared.Components.Core.Modal
+@inject LocalEstoqueService LocalService
+
+<Modal @ref="modalRef" Title="@(Local.Id == 0 ? "Novo Almoxarifado / Local" : "Editar Almoxarifado")" Size="ModalSize.Default">
+    <BodyContent>
+        <EditForm Model="Local" OnValidSubmit="SalvarLocal">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Código <span class="text-danger">*</span></label>
+                    <InputText class="form-control" placeholder="ex: ALM-01" @bind-Value="Local.Codigo" required />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Nome do Local <span class="text-danger">*</span></label>
+                    <InputText class="form-control" placeholder="ex: Almoxarifado Central" @bind-Value="Local.Nome" required />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Descrição / Localização</label>
+                    <InputTextArea class="form-control" rows="2" placeholder="ex: Galpão A, Pavimento Térreo" @bind-Value="Local.Descricao" />
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch mt-3">
+                        <InputCheckbox class="form-check-input" id="chkPermiteNegativo" @bind-Value="Local.PermiteSaldoNegativo" />
+                        <label class="form-check-label" for="chkPermiteNegativo">Permite Saldo Negativo</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch mt-3">
+                        <InputCheckbox class="form-check-input" id="chkAtivo" @bind-Value="Local.Ativo" />
+                        <label class="form-check-label" for="chkAtivo">Local Ativo</label>
+                    </div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(mensagemErro))
+            {
+                <div class="alert alert-danger mt-3 py-2">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErro
+                </div>
+            }
+        </EditForm>
+    </BodyContent>
+    <FooterContent>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Fechar">Cancelar</button>
+        <button type="button" class="btn btn-primary" @onclick="SalvarLocal" disabled="@isSaving">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <i class="bi bi-check2-circle me-1"></i>
+                <span>Salvar</span>
+            }
+        </button>
+    </FooterContent>
+</Modal>
+
+@code {
+    private Modal? modalRef;
+    private bool isSaving = false;
+    private string? mensagemErro;
+
+    [Parameter] public LocalEstoque Local { get; set; } = new();
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    public void Abrir(LocalEstoque? local = null)
+    {
+        Local = local ?? new LocalEstoque { Ativo = true };
+        mensagemErro = null;
+        isSaving = false;
+        modalRef?.Open();
+        StateHasChanged();
+    }
+
+    public void Fechar()
+    {
+        modalRef?.Close();
+    }
+
+    private async Task SalvarLocal()
+    {
+        if (string.IsNullOrWhiteSpace(Local.Codigo) || string.IsNullOrWhiteSpace(Local.Nome))
+        {
+            mensagemErro = "Por favor preencha o Código e o Nome do almoxarifado.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            mensagemErro = null;
+            await LocalService.SaveAsync(Local);
+            Fechar();
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

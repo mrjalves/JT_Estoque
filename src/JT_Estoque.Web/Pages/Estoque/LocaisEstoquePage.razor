@@ -1,0 +1,189 @@
+@page "/estoque/locais"
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Services
+@using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Templates
+@inject LocalEstoqueService LocalService
+
+<CrudPageTemplate PageTitle="Almoxarifados e Locais de Armazenamento" PageIcon="bi-building">
+    <PageDescription>
+        Cadastro de almoxarifados, centros de distribuição, galpões e configurações de restrição de saldo por depósito.
+    </PageDescription>
+
+    <ToolbarLeft>
+        <button class="btn btn-primary shadow-sm" @onclick="() => modalLocalRef?.Abrir()">
+            <i class="bi bi-plus-circle-fill me-1"></i>
+            <span>Novo Almoxarifado</span>
+        </button>
+    </ToolbarLeft>
+
+    <ToolbarRight>
+        <div class="input-group input-group-sm" style="max-width: 250px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" placeholder="Buscar por código ou nome..." @bind="termoPesquisa" @bind:event="oninput" />
+        </div>
+    </ToolbarRight>
+
+    <ChildContent>
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-2 text-muted">Carregando almoxarifados...</div>
+            </div>
+        }
+        else if (!LocaisFiltrados.Any())
+        {
+            <div class="card p-5 text-center border-0 shadow-sm">
+                <i class="bi bi-building-x display-3 text-muted mb-3"></i>
+                <h5 class="fw-bold">Nenhum almoxarifado cadastrado</h5>
+                <p class="text-muted">Cadastre os depósitos ou locais de estoque da sua empresa.</p>
+                <div class="mt-2">
+                    <button class="btn btn-primary" @onclick="() => modalLocalRef?.Abrir()">
+                        <i class="bi bi-plus-lg me-1"></i>Criar Primeiro Local
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card card-modern overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Código</th>
+                                <th>Nome do Almoxarifado</th>
+                                <th>Descrição / Endereço</th>
+                                <th class="text-center">Permite Negativo</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in LocaisFiltrados)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold font-monospace text-primary">@l.Codigo</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@l.Nome</div>
+                                    </td>
+                                    <td>
+                                        <div class="text-muted small">@(!string.IsNullOrEmpty(l.Descricao) ? l.Descricao : "-")</div>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (l.PermiteSaldoNegativo)
+                                        {
+                                            <span class="badge bg-warning text-dark"><i class="bi bi-check-lg me-1"></i>Permite</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-light text-muted border">Não Permite</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (l.Ativo)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border">Inativo</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" title="Editar" @onclick="() => modalLocalRef?.Abrir(l)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" title="Excluir" @onclick="() => SolicitarExclusao(l)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </ChildContent>
+
+    <Modals>
+        <ModalLocalEstoque @ref="modalLocalRef" OnSaved="CarregarLocaisAsync" />
+        <ConfirmDialog @ref="confirmDeleteDialog" OnConfirm="ExcluirLocal" />
+    </Modals>
+</CrudPageTemplate>
+
+@code {
+    private bool isLoading = true;
+    private List<LocalEstoque> locais = [];
+    private string termoPesquisa = string.Empty;
+
+    private LocalEstoque? localParaExcluir;
+
+    private ModalLocalEstoque? modalLocalRef;
+    private ConfirmDialog? confirmDeleteDialog;
+
+    private IEnumerable<LocalEstoque> LocaisFiltrados
+    {
+        get
+        {
+            var query = locais.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(termoPesquisa))
+            {
+                query = query.Where(l =>
+                    l.Nome.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase) ||
+                    l.Codigo.Contains(termoPesquisa, StringComparison.OrdinalIgnoreCase));
+            }
+            return query.OrderBy(l => l.Nome);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarLocaisAsync();
+    }
+
+    private async Task CarregarLocaisAsync()
+    {
+        try
+        {
+            isLoading = true;
+            locais = await LocalService.GetAll();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar locais: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SolicitarExclusao(LocalEstoque local)
+    {
+        localParaExcluir = local;
+        confirmDeleteDialog?.Show(
+            "Excluir Almoxarifado",
+            $"Tem certeza que deseja excluir o almoxarifado '{local.Nome}' ({local.Codigo})?",
+            "Excluir",
+            "Cancelar"
+        );
+    }
+
+    private async Task ExcluirLocal()
+    {
+        if (localParaExcluir != null)
+        {
+            await LocalService.Delete(localParaExcluir.Id);
+            localParaExcluir = null;
+            await CarregarLocaisAsync();
+        }
+    }
+}

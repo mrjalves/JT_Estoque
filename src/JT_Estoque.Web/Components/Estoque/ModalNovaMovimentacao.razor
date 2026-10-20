@@ -1,0 +1,296 @@
+@using JT_Classes.CRM
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Enums
+@using JT_Estoque.Core.Services
+@using JT_Servicos.CRM
+@using JT_UserInterface.Shared.Components.Core
+@using static JT_UserInterface.Shared.Components.Core.Modal
+@inject MovimentacaoEstoqueService MovimentacaoService
+@inject ProdutoEstoqueService ProdutoService
+@inject LocalEstoqueService LocalService
+@inject LoteEstoqueService LoteService
+@inject FornecedorService FornecedorService
+
+<Modal @ref="modalRef" Title="Nova Movimentação de Estoque (Kardex)" Size="ModalSize.Large">
+    <BodyContent>
+        <EditForm Model="Movimentacao" OnValidSubmit="RegistrarMovimentacao">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3">
+                <!-- Tipo de Movimentação -->
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Tipo de Movimentação <span class="text-danger">*</span></label>
+                    <InputSelect class="form-select fw-bold text-primary" @bind-Value="Movimentacao.TipoMovimentacao">
+                        <option value="@eTipoMovimentacaoEstoque.EntradaCompra">Entrada por Compra</option>
+                        <option value="@eTipoMovimentacaoEstoque.SaidaVenda">Saída por Venda</option>
+                        <option value="@eTipoMovimentacaoEstoque.SaidaConsumoInterno">Saída para Consumo Interno</option>
+                        <option value="@eTipoMovimentacaoEstoque.TransferenciaSaida">Transferência entre Almoxarifados</option>
+                        <option value="@eTipoMovimentacaoEstoque.AjusteInventarioPositivo">Ajuste de Inventário (+)</option>
+                        <option value="@eTipoMovimentacaoEstoque.AjusteInventarioNegativo">Ajuste de Inventário (-)</option>
+                        <option value="@eTipoMovimentacaoEstoque.PerdaOuAvaria">Perda ou Avaria</option>
+                        <option value="@eTipoMovimentacaoEstoque.DevolucaoCliente">Devolução de Cliente (+)</option>
+                        <option value="@eTipoMovimentacaoEstoque.DevolucaoFornecedor">Devolução a Fornecedor (-)</option>
+                    </InputSelect>
+                </div>
+
+                <!-- Produto -->
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Produto <span class="text-danger">*</span></label>
+                    <InputSelect class="form-select" Value="Movimentacao.ProdutoId" ValueExpression="() => Movimentacao.ProdutoId" ValueChanged="((int id) => OnProdutoChanged(id))">
+                        <option value="0">Selecione um produto...</option>
+                        @foreach (var prod in produtos)
+                        {
+                            <option value="@prod.Id">@prod.Nome (@prod.CodigoSKU) - Saldo: @prod.QuantidadeEstoque @prod.UnidadeMedida</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <!-- Almoxarifado Origem -->
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Almoxarifado @(EhTransferencia ? "Origem" : "") <span class="text-danger">*</span></label>
+                    <InputSelect class="form-select" @bind-Value="Movimentacao.LocalOrigemId">
+                        <option value="0">Selecione o local...</option>
+                        @foreach (var loc in locais)
+                        {
+                            <option value="@loc.Id">@loc.Nome (@loc.Codigo)</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <!-- Almoxarifado Destino se for Transferência -->
+                @if (EhTransferencia)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Almoxarifado Destino <span class="text-danger">*</span></label>
+                        <InputSelect class="form-select" @bind-Value="Movimentacao.LocalDestinoId">
+                            <option value="">Selecione o destino...</option>
+                            @foreach (var loc in locais.Where(l => l.Id != Movimentacao.LocalOrigemId))
+                            {
+                                <option value="@loc.Id">@loc.Nome (@loc.Codigo)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
+
+                <!-- Quantidade -->
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Quantidade <span class="text-danger">*</span></label>
+                    <InputNumber class="form-control fw-bold" step="0.0001" @bind-Value="Movimentacao.Quantidade" />
+                </div>
+
+                <!-- Custo Unitário se for Compra ou Entrada -->
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Custo Unitário (R$)</label>
+                    <InputNumber class="form-control" step="0.0001" @bind-Value="Movimentacao.CustoUnitario" />
+                    <small class="text-muted">@(EhEntradaCompra ? "Recalcula Custo Médio" : "Custo contábil")</small>
+                </div>
+
+                <!-- Lote -->
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Lote</label>
+                    <InputSelect class="form-select" @bind-Value="Movimentacao.LoteId">
+                        <option value="">(Sem lote específico)</option>
+                        @foreach (var lote in lotesProduto)
+                        {
+                            <option value="@lote.Id">@lote.CodigoLote (Saldo: @lote.QuantidadeSaldo | Val: @(lote.DataValidade?.ToString("dd/MM/yyyy") ?? "-"))</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <!-- Fornecedor se for Compra ou Devolução -->
+                @if (EhEntradaCompra || Movimentacao.TipoMovimentacao == eTipoMovimentacaoEstoque.DevolucaoFornecedor)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Fornecedor</label>
+                        <InputSelect class="form-select" @bind-Value="Movimentacao.FornecedorId">
+                            <option value="">(Nenhum selecionado)</option>
+                            @foreach (var f in fornecedores)
+                            {
+                                <option value="@f.Id">@f.Nome</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
+
+                <!-- Documento Referência -->
+                <div class="col-md-@(EhEntradaCompra || Movimentacao.TipoMovimentacao == eTipoMovimentacaoEstoque.DevolucaoFornecedor ? "6" : "12")">
+                    <label class="form-label fw-semibold">NF / Documento de Referência</label>
+                    <InputText class="form-control" placeholder="ex: NF-e 12345 / Req-098" @bind-Value="Movimentacao.DocumentoReferencia" />
+                </div>
+
+                <!-- Observação -->
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Observações / Motivo da Movimentação</label>
+                    <InputTextArea class="form-control" rows="2" placeholder="Descreva os detalhes da operação..." @bind-Value="Movimentacao.Observacao" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(mensagemErro))
+            {
+                <div class="alert alert-danger mt-3 py-2">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErro
+                </div>
+            }
+        </EditForm>
+    </BodyContent>
+    <FooterContent>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Fechar">Cancelar</button>
+        <button type="button" class="btn btn-success" @onclick="RegistrarMovimentacao" disabled="@isSaving">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Processando Kardex...</span>
+            }
+            else
+            {
+                <i class="bi bi-box-arrow-in-down me-1"></i>
+                <span>Confirmar Lançamento</span>
+            }
+        </button>
+    </FooterContent>
+</Modal>
+
+@code {
+    private Modal? modalRef;
+    private bool isSaving = false;
+    private string? mensagemErro;
+
+    private List<ProdutoEstoque> produtos = [];
+    private List<LocalEstoque> locais = [];
+    private List<Fornecedor> fornecedores = [];
+    private List<LoteEstoque> lotesProduto = [];
+
+    [Parameter] public MovimentacaoEstoque Movimentacao { get; set; } = new();
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private bool EhTransferencia => Movimentacao.TipoMovimentacao == eTipoMovimentacaoEstoque.TransferenciaSaida;
+    private bool EhEntradaCompra => Movimentacao.TipoMovimentacao == eTipoMovimentacaoEstoque.EntradaCompra;
+
+    public async Task Abrir(int? produtoIdPadrao = null)
+    {
+        Movimentacao = new MovimentacaoEstoque
+        {
+            DataMovimentacao = DateTime.Now,
+            TipoMovimentacao = eTipoMovimentacaoEstoque.EntradaCompra,
+            Quantidade = 1
+        };
+
+        mensagemErro = null;
+        isSaving = false;
+
+        try
+        {
+            produtos = await ProdutoService.GetAll();
+            locais = await LocalService.GetAll();
+            fornecedores = await FornecedorService.GetAll();
+
+            if (produtoIdPadrao.HasValue && produtoIdPadrao.Value > 0)
+            {
+                Movimentacao.ProdutoId = produtoIdPadrao.Value;
+                await OnProdutoMudou();
+            }
+            else if (produtos.Any())
+            {
+                Movimentacao.ProdutoId = produtos.First().Id;
+                await OnProdutoMudou();
+            }
+
+            if (locais.Any())
+            {
+                Movimentacao.LocalOrigemId = locais.First().Id;
+            }
+        }
+        catch { }
+
+        modalRef?.Open();
+        StateHasChanged();
+    }
+
+    public void Fechar()
+    {
+        modalRef?.Close();
+    }
+
+    private async Task OnProdutoChanged(int id)
+    {
+        Movimentacao.ProdutoId = id;
+        await OnProdutoMudou();
+    }
+
+    private async Task OnProdutoMudou()
+    {
+        if (Movimentacao.ProdutoId > 0)
+        {
+            var p = produtos.FirstOrDefault(x => x.Id == Movimentacao.ProdutoId);
+            if (p != null)
+            {
+                Movimentacao.CustoUnitario = p.PrecoCusto > 0 ? p.PrecoCusto : p.CustoMedio;
+                if (p.LocalPadraoId.HasValue && p.LocalPadraoId.Value > 0)
+                {
+                    Movimentacao.LocalOrigemId = p.LocalPadraoId.Value;
+                }
+                if (p.FornecedorPadraoId.HasValue && p.FornecedorPadraoId.Value > 0)
+                {
+                    Movimentacao.FornecedorId = p.FornecedorPadraoId.Value;
+                }
+            }
+
+            try
+            {
+                lotesProduto = await LoteService.ObterLotesPorProdutoAsync(Movimentacao.ProdutoId);
+            }
+            catch
+            {
+                lotesProduto = [];
+            }
+        }
+        else
+        {
+            lotesProduto = [];
+        }
+    }
+
+    private async Task RegistrarMovimentacao()
+    {
+        if (Movimentacao.ProdutoId <= 0)
+        {
+            mensagemErro = "Selecione um produto.";
+            return;
+        }
+
+        if (Movimentacao.LocalOrigemId <= 0)
+        {
+            mensagemErro = "Selecione o almoxarifado de origem.";
+            return;
+        }
+
+        if (EhTransferencia && (!Movimentacao.LocalDestinoId.HasValue || Movimentacao.LocalDestinoId.Value <= 0))
+        {
+            mensagemErro = "Selecione o almoxarifado destino para a transferência.";
+            return;
+        }
+
+        if (Movimentacao.Quantidade <= 0)
+        {
+            mensagemErro = "A quantidade movimentada deve ser maior que zero.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            mensagemErro = null;
+            await MovimentacaoService.RegistrarMovimentacaoKardexAsync(Movimentacao);
+            Fechar();
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagemErro = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

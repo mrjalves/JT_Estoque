@@ -1,0 +1,213 @@
+@page "/estoque/movimentacoes"
+@using JT_Estoque.Core.Entities
+@using JT_Estoque.Core.Enums
+@using JT_Estoque.Core.Services
+@using JT_UserInterface.Shared.Components.Core
+@using JT_UserInterface.Shared.Templates
+@inject MovimentacaoEstoqueService MovimentacaoService
+@inject ProdutoEstoqueService ProdutoService
+@inject LocalEstoqueService LocalService
+
+<CrudPageTemplate PageTitle="Livro-Razão Kardex (Movimentações)" PageIcon="bi-arrow-left-right">
+    <PageDescription>
+        Extrato oficial de movimentações com rastreamento de entradas, saídas, transferências, custos unitários e saldos resultantes.
+    </PageDescription>
+
+    <ToolbarLeft>
+        <button class="btn btn-primary shadow-sm" @onclick="() => modalMovimentacaoRef?.Abrir()">
+            <i class="bi bi-plus-circle-fill me-1"></i>
+            <span>Nova Movimentação</span>
+        </button>
+    </ToolbarLeft>
+
+    <ToolbarRight>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Filtro Produto -->
+            <select class="form-select form-select-sm" style="max-width: 200px;" @bind="filtroProdutoId">
+                <option value="0">Todos os Produtos</option>
+                @foreach (var p in produtos)
+                {
+                    <option value="@p.Id">@p.Nome (@p.CodigoSKU)</option>
+                }
+            </select>
+
+            <!-- Filtro Almoxarifado -->
+            <select class="form-select form-select-sm" style="max-width: 180px;" @bind="filtroLocalId">
+                <option value="0">Todos os Locais</option>
+                @foreach (var l in locais)
+                {
+                    <option value="@l.Id">@l.Nome</option>
+                }
+            </select>
+        </div>
+    </ToolbarRight>
+
+    <ChildContent>
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-2 text-muted">Carregando livro-razão Kardex...</div>
+            </div>
+        }
+        else if (!MovimentacoesFiltradas.Any())
+        {
+            <div class="card p-5 text-center border-0 shadow-sm">
+                <i class="bi bi-clock-history display-3 text-muted mb-3"></i>
+                <h5 class="fw-bold">Nenhuma movimentação registrada</h5>
+                <p class="text-muted">Ainda não há lançamentos de estoque com os filtros aplicados.</p>
+                <div class="mt-2">
+                    <button class="btn btn-primary" @onclick="() => modalMovimentacaoRef?.Abrir()">
+                        <i class="bi bi-plus-lg me-1"></i>Registrar Primeira Operação
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card card-modern overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Tipo de Operação</th>
+                                <th>Produto</th>
+                                <th>Almoxarifado</th>
+                                <th class="text-end">Quantidade</th>
+                                <th class="text-end">Custo Unitário</th>
+                                <th class="text-center">Evolução do Saldo</th>
+                                <th>Documento / Ref</th>
+                                <th>Observação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in MovimentacoesFiltradas)
+                            {
+                                var prod = produtos.FirstOrDefault(p => p.Id == m.ProdutoId);
+                                var localOrigem = locais.FirstOrDefault(l => l.Id == m.LocalOrigemId);
+                                var localDestino = m.LocalDestinoId.HasValue ? locais.FirstOrDefault(l => l.Id == m.LocalDestinoId.Value) : null;
+                                bool isEntrada = EhTipoEntrada(m.TipoMovimentacao);
+
+                                <tr>
+                                    <td class="small text-muted font-monospace">
+                                        @m.DataMovimentacao.ToString("dd/MM/yyyy HH:mm")
+                                    </td>
+                                    <td>
+                                        <span class="badge @ObterClasseBadge(m.TipoMovimentacao)">
+                                            @m.TipoMovimentacao
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@(prod?.Nome ?? $"Produto #{m.ProdutoId}")</div>
+                                        <small class="text-muted font-monospace">@(prod?.CodigoSKU ?? "")</small>
+                                    </td>
+                                    <td>
+                                        <div>@(localOrigem?.Nome ?? "Almoxarifado")</div>
+                                        @if (localDestino != null)
+                                        {
+                                            <small class="text-primary"><i class="bi bi-arrow-right me-1"></i>@localDestino.Nome</small>
+                                        }
+                                    </td>
+                                    <td class="text-end fw-bold @(isEntrada ? "text-success" : "text-danger")">
+                                        @(isEntrada ? "+" : "-")@m.Quantidade.ToString("N2")
+                                    </td>
+                                    <td class="text-end">
+                                        @(m.CustoUnitario > 0 ? m.CustoUnitario.ToString("C2") : "-")
+                                    </td>
+                                    <td class="text-center small">
+                                        <span class="text-muted">@m.SaldoAnterior.ToString("N0")</span>
+                                        <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                        <span class="fw-bold">@m.SaldoPosterior.ToString("N0")</span>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(m.DocumentoReferencia))
+                                        {
+                                            <span class="badge bg-light text-dark border font-monospace">@m.DocumentoReferencia</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                    </td>
+                                    <td class="small text-muted" style="max-width: 250px;">
+                                        @m.Observacao
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </ChildContent>
+
+    <Modals>
+        <ModalNovaMovimentacao @ref="modalMovimentacaoRef" OnSaved="CarregarMovimentacoesAsync" />
+    </Modals>
+</CrudPageTemplate>
+
+@code {
+    private bool isLoading = true;
+    private List<MovimentacaoEstoque> movimentacoes = [];
+    private List<ProdutoEstoque> produtos = [];
+    private List<LocalEstoque> locais = [];
+
+    private int filtroProdutoId = 0;
+    private int filtroLocalId = 0;
+
+    private ModalNovaMovimentacao? modalMovimentacaoRef;
+
+    private IEnumerable<MovimentacaoEstoque> MovimentacoesFiltradas
+    {
+        get
+        {
+            var query = movimentacoes.AsEnumerable();
+
+            if (filtroProdutoId > 0)
+                query = query.Where(m => m.ProdutoId == filtroProdutoId);
+
+            if (filtroLocalId > 0)
+                query = query.Where(m => m.LocalOrigemId == filtroLocalId || m.LocalDestinoId == filtroLocalId);
+
+            return query.OrderByDescending(m => m.DataMovimentacao);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarMovimentacoesAsync();
+    }
+
+    private async Task CarregarMovimentacoesAsync()
+    {
+        try
+        {
+            isLoading = true;
+            movimentacoes = await MovimentacaoService.GetAll();
+            produtos = await ProdutoService.GetAll();
+            locais = await LocalService.GetAll();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar kardex: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool EhTipoEntrada(eTipoMovimentacaoEstoque tipo) =>
+        tipo is eTipoMovimentacaoEstoque.EntradaCompra or eTipoMovimentacaoEstoque.TransferenciaEntrada
+            or eTipoMovimentacaoEstoque.AjusteInventarioPositivo or eTipoMovimentacaoEstoque.DevolucaoCliente;
+
+    private string ObterClasseBadge(eTipoMovimentacaoEstoque tipo) => tipo switch
+    {
+        eTipoMovimentacaoEstoque.EntradaCompra or eTipoMovimentacaoEstoque.TransferenciaEntrada or eTipoMovimentacaoEstoque.DevolucaoCliente => "badge-mov-entrada",
+        eTipoMovimentacaoEstoque.SaidaVenda or eTipoMovimentacaoEstoque.SaidaConsumoInterno or eTipoMovimentacaoEstoque.DevolucaoFornecedor => "badge-mov-saida",
+        eTipoMovimentacaoEstoque.TransferenciaSaida => "badge-mov-transf",
+        _ => "badge-mov-ajuste"
+    };
+}
