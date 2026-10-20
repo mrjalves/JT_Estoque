@@ -1,15 +1,18 @@
 using JT_Aplicacao.Config;
+using JT_Classes.Acessos;
 using JT_Classes.CRM;
 using JT_Estoque.Core.Entities;
 using JT_Estoque.Core.IATools;
 using JT_Estoque.Core.Services;
 using JT_Estoque.Web.Components;
 using JT_Estoque.Web.Providers;
+using JT_Estoque.Web.Services;
 using JT_Servicos.CRM;
 using JT_Servicos.IA.Tools;
 using JT_UserInterface.Shared;
 using JT_UserInterface.Shared.Layout;
 using JT_UserInterface.Shared.Services.Interfaces.Comum;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,21 +27,60 @@ if (configSection != null)
 }
 Config.Instancia.ClientId = "JT_Estoque";
 
-// 3. Configura os componentes Blazor no modo Servidor Interativo
+// 3. Inicializa e registra o FirebaseConfig
+builder.Services.Configure<FirebaseConfig>(builder.Configuration.GetSection("Config:FirebaseConfig"));
+var secaoFConfig = builder.Configuration.GetSection("Config:FirebaseConfig").Get<FirebaseConfig>();
+if (secaoFConfig != null)
+{
+    FirebaseConfig.SetInstancia(secaoFConfig);
+    builder.Services.AddSingleton(FirebaseConfig.Instancia);
+}
+
+// 4. Configuração de cabeçalhos de proxy reverso (Nginx / Linux)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// 5. Configura os componentes Blazor no modo Servidor Interativo
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// 4. Registra todos os serviços e componentes compartilhados da DLL JT_UserInterface.Shared
+// 6. Registra armazenamento seguro na Web e interface compartilhada
+builder.Services.AddScoped<ISecureStorageService, WebSecureStorageService>();
 builder.Services.AddJTUserInterface();
 
-// 5. Configuração do HttpClient padrão
-builder.Services.AddHttpClient(string.Empty, client =>
+// 7. Configuração do HttpClient padrão com cabeçalho X-Client-Config (Multi-Tenant)
+builder.Services.AddHttpClient();
+builder.Services.AddScoped(sp =>
 {
-    var baseUrl = builder.Configuration["Config:Conexao:BaseApiUrl"] ?? "https://localhost:7166";
-    client.BaseAddress = new Uri(baseUrl);
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = factory.CreateClient(string.Empty);
+
+    var baseUrl = builder.Configuration["Config:Conexao:BaseApiUrl"]
+               ?? builder.Configuration["Config:FirebaseConfig:BaseApiUrl"]
+               ?? "https://api.jtecsistemas.com.br";
+    httpClient.BaseAddress = new Uri(baseUrl);
+
+    var configPayload = new ClientConfigPayload { ClientId = "JT_Estoque" };
+    if (Config.Instancia != null)
+    {
+        Config.Instancia.ClientId = configPayload.ClientId;
+    }
+
+    var json = System.Text.Json.JsonSerializer.Serialize(configPayload);
+    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+    if (!httpClient.DefaultRequestHeaders.Contains("X-Client-Config"))
+    {
+        httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);
+    }
+
+    return httpClient;
 });
 
-// 6. Registra os Serviços de Domínio do Estoque (App Client)
+// 8. Registra os Serviços de Domínio do Estoque (App Client)
 builder.Services.AddScoped<LocalEstoqueService>();
 builder.Services.AddScoped<ProdutoEstoqueService>();
 builder.Services.AddScoped<LoteEstoqueService>();
@@ -46,7 +88,7 @@ builder.Services.AddScoped<MovimentacaoEstoqueService>();
 builder.Services.AddScoped<InventarioEstoqueService>();
 builder.Services.AddScoped<FornecedorService>();
 
-// 7. Registra os Providers de Menu, Categorias e Tools de IA do Estoque
+// 9. Registra os Providers de Menu, Categorias e Tools de IA do Estoque
 builder.Services.AddScoped<IMenuProvider, EstoqueMenuProvider>();
 builder.Services.AddScoped<IModuloMenuProvider, EstoqueMenuProvider>();
 builder.Services.AddScoped<IModuloCategoriaProvider, EstoqueCategoriaProvider>();
@@ -55,6 +97,8 @@ builder.Services.AddScoped<IAToolBase, ConsultarRupturaEstoqueTool>();
 builder.Services.AddScoped<IAToolBase, ConsultarKardexProdutoTool>();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -71,7 +115,8 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(
         typeof(MainLayout).Assembly,
-        typeof(ProdutoEstoque).Assembly
+        typeof(ProdutoEstoque).Assembly,
+        typeof(Program).Assembly
     );
 
 app.Run();
