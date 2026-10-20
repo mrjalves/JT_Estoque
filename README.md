@@ -23,11 +23,11 @@ O projeto adota uma arquitetura em duas camadas principais, reutilizando a infra
 
 ```mermaid
 graph TD
-    UI[JT_Estoque.Web<br/>Blazor Server Interativo / .NET 10]
-    Core[JT_Estoque.Core<br/>Entidades, Serviços, Regras, IA Tools]
-    JTApp[JT_ApplicationLayer<br/>JT_Aplicacao | JT_Classes | JT_Infra_Data | JT_Servicos | JT_RegrasNegocios | JT_UserInterface.Shared]
-    DB[(SQL Server Database<br/>Azure / Local)]
-    AI[Microsoft Semantic Kernel<br/>Ferramentas de IA para Chatbot]
+    UI["JT_Estoque.Web<br/>Blazor Server Interativo (.NET 10)"]
+    Core["JT_Estoque.Core<br/>Entidades, Serviços, Regras, IA Tools"]
+    JTApp["JT_ApplicationLayer<br/>(JT_Aplicacao, JT_Classes, JT_Infra_Data, JT_Servicos, JT_RegrasNegocios, JT_UserInterface.Shared)"]
+    DB[("SQL Server Database<br/>Azure / Local")]
+    AI["Microsoft Semantic Kernel<br/>Ferramentas de IA para Chatbot"]
 
     UI --> Core
     UI --> JTApp
