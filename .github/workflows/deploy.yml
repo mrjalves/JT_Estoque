@@ -127,8 +127,10 @@ jobs:
             exit 1
           fi
 
-          if ! sh -c "$JSON_VALIDATOR \"$APPSETTINGS_PATH\"" >/dev/null 2>&1; then
+          if ! VALIDATION_OUTPUT=$(sh -c "$JSON_VALIDATOR \"$APPSETTINGS_PATH\" >/dev/null" 2>&1); then
             echo "::error::JSON inválido em $APPSETTINGS_PATH. Corrija o arquivo antes do restart."
+            echo "Detalhe do parse:"
+            echo "$VALIDATION_OUTPUT"
             echo "Últimas linhas do arquivo para diagnóstico:"
             nl -ba "$APPSETTINGS_PATH" | tail -n 80 || true
             exit 1
