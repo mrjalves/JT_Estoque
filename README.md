@@ -187,6 +187,8 @@ O arquivo [appsettings.json](file:///c:/Users/sirja/source/repos/mrjalves/JT_Est
 
 > **Nota sobre Migrações**: As tabelas e a View `VwSaldoEstoquePorLocal` são mapeadas via decorators (`[NomeTabela]`, `[MapearComoView]`) e provisionadas dinamicamente pelo migrador do framework (`DbSchemaMigrator`) ao carregar os tipos de `JT_Estoque.Core`.
 
+> **Nota de Produção**: o arquivo `appsettings.Production.json` precisa conter **apenas um objeto JSON válido**. Qualquer conteúdo extra após a chave final (`}`) fará a aplicação abortar na inicialização com erro de parse. Antes de reiniciar o serviço, valide no servidor com `python3 -m json.tool /var/www/jt_sistemas_estoque/appsettings.Production.json`.
+
 ### Executando o Projeto
 
 Via linha de comando (PowerShell/Terminal):

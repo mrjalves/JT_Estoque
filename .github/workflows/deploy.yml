@@ -107,15 +107,40 @@ jobs:
 
       - name: Reiniciar e verificar serviço
         run: |
-          ssh -p "$VPS_PORT" -o BatchMode=yes "$VPS_USER@$VPS_HOST" 'bash -s' <<'EOF'
+          ssh -p "$VPS_PORT" -o BatchMode=yes "$VPS_USER@$VPS_HOST" 'bash -s' -- "$VPS_PATH" "${{ env.SERVICE }}" <<'EOF'
           set -e
-          sudo systemctl restart ${{ env.SERVICE }}
+          VPS_PATH="$1"
+          SERVICE_NAME="$2"
+          APPSETTINGS_PATH="$VPS_PATH/appsettings.Production.json"
+
+          if [ ! -f "$APPSETTINGS_PATH" ]; then
+            echo "::error::Arquivo de configuração não encontrado: $APPSETTINGS_PATH"
+            exit 1
+          fi
+
+          if command -v python3 >/dev/null 2>&1; then
+            JSON_VALIDATOR="python3 -m json.tool"
+          elif command -v python >/dev/null 2>&1; then
+            JSON_VALIDATOR="python -m json.tool"
+          else
+            echo "::error::Não foi encontrado python/python3 para validar JSON em $APPSETTINGS_PATH"
+            exit 1
+          fi
+
+          if ! sh -c "$JSON_VALIDATOR \"$APPSETTINGS_PATH\"" >/dev/null 2>&1; then
+            echo "::error::JSON inválido em $APPSETTINGS_PATH. Corrija o arquivo antes do restart."
+            echo "Últimas linhas do arquivo para diagnóstico:"
+            nl -ba "$APPSETTINGS_PATH" | tail -n 80 || true
+            exit 1
+          fi
+
+          sudo systemctl restart "$SERVICE_NAME"
           sleep 15
-          if ! systemctl is-active --quiet ${{ env.SERVICE }}; then
-            echo "::error::Serviço ${{ env.SERVICE }} não subiu"
-            journalctl -u ${{ env.SERVICE }} -n 50 --no-pager || true
+          if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+            echo "::error::Serviço $SERVICE_NAME não subiu"
+            journalctl -u "$SERVICE_NAME" -n 50 --no-pager || true
             exit 1
           fi
           echo "Serviço ativo. Logs de inicialização/migração:"
-          journalctl -u ${{ env.SERVICE }} -n 30 --no-pager | grep -A5 MIGRACAO || true
+          journalctl -u "$SERVICE_NAME" -n 30 --no-pager | grep -A5 MIGRACAO || true
           EOF
