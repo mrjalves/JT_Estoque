@@ -12,7 +12,7 @@ namespace JT_Estoque.Web.Providers
             {
                 NomeModulo = "Estoque & Logística",
                 Icone = "bi-boxes",
-                Modulo = eModuloSistema.Gestao,
+                Modulo = (eModuloSistema)14,
                 Itens =
                 [
                     new SItemMenu { Url = "/estoque/dashboard", Texto = "Dashboard", Icone = "bi-speedometer2", Titulo = "Visão Geral do Estoque" },

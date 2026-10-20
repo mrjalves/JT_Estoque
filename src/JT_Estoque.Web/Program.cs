@@ -12,7 +12,13 @@ using JT_Servicos.IA.Tools;
 using JT_UserInterface.Shared;
 using JT_UserInterface.Shared.Layout;
 using JT_UserInterface.Shared.Services.Interfaces.Comum;
+using System.Globalization;
 using Microsoft.AspNetCore.HttpOverrides;
+
+// Configura Cultura padrão pt-BR (moeda R$, datas, etc.)
+var culturaPtBr = new CultureInfo("pt-BR");
+CultureInfo.DefaultThreadCurrentCulture = culturaPtBr;
+CultureInfo.DefaultThreadCurrentUICulture = culturaPtBr;
 
 var builder = WebApplication.CreateBuilder(args);
 
