@@ -11,7 +11,14 @@
 @inject LoteEstoqueService LoteService
 @inject FornecedorService FornecedorService
 
-<Modal @ref="modalRef" Title="Nova Movimentação de Estoque (Kardex)" Size="ModalSize.Large">
+<Modal @ref="modalRef" 
+       Title="Nova Movimentação de Estoque (Kardex)" 
+       Size="ModalSize.Large"
+       EntidadeContexto="@Movimentacao"
+       EnableIA="true"
+       NomeEntidade="MovimentacaoEstoque"
+       CanManageCustomFields="true"
+       CloseOnBackdropClick="false">
     <BodyContent>
         <EditForm Model="Movimentacao" OnValidSubmit="RegistrarMovimentacao">
             <DataAnnotationsValidator />
@@ -131,23 +138,25 @@
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErro
                 </div>
             }
+
+            <hr class="my-3" />
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" @onclick="Fechar">Cancelar</button>
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Processando Kardex...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-box-arrow-in-down me-1"></i>
+                        <span>Confirmar Lançamento</span>
+                    }
+                </button>
+            </div>
         </EditForm>
     </BodyContent>
-    <FooterContent>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Fechar">Cancelar</button>
-        <button type="button" class="btn btn-success" @onclick="RegistrarMovimentacao" disabled="@isSaving">
-            @if (isSaving)
-            {
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                <span>Processando Kardex...</span>
-            }
-            else
-            {
-                <i class="bi bi-box-arrow-in-down me-1"></i>
-                <span>Confirmar Lançamento</span>
-            }
-        </button>
-    </FooterContent>
 </Modal>
 
 @code {

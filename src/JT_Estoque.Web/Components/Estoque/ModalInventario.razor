@@ -5,7 +5,14 @@
 @inject InventarioEstoqueService InventarioService
 @inject LocalEstoqueService LocalService
 
-<Modal @ref="modalRef" Title="Abrir Nova Sessão de Inventário Físico" Size="ModalSize.Default">
+<Modal @ref="modalRef" 
+       Title="Abrir Nova Sessão de Inventário Físico" 
+       Size="ModalSize.Default"
+       EntidadeContexto="@Inventario"
+       EnableIA="true"
+       NomeEntidade="InventarioEstoque"
+       CanManageCustomFields="true"
+       CloseOnBackdropClick="false">
     <BodyContent>
         <EditForm Model="this" OnValidSubmit="CriarSessao">
             <DataAnnotationsValidator />
@@ -46,23 +53,25 @@
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensagemErro
                 </div>
             }
+
+            <hr class="my-3" />
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" @onclick="Fechar">Cancelar</button>
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Congelando Saldo...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-play-circle-fill me-1"></i>
+                        <span>Iniciar Contagem</span>
+                    }
+                </button>
+            </div>
         </EditForm>
     </BodyContent>
-    <FooterContent>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Fechar">Cancelar</button>
-        <button type="button" class="btn btn-primary" @onclick="CriarSessao" disabled="@isSaving">
-            @if (isSaving)
-            {
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                <span>Congelando Saldo...</span>
-            }
-            else
-            {
-                <i class="bi bi-play-circle-fill me-1"></i>
-                <span>Iniciar Contagem</span>
-            }
-        </button>
-    </FooterContent>
 </Modal>
 
 @code {
@@ -75,10 +84,12 @@
     private string observacao = string.Empty;
     private List<LocalEstoque> locais = [];
 
+    [Parameter] public InventarioEstoque Inventario { get; set; } = new();
     [Parameter] public EventCallback OnSaved { get; set; }
 
     public async Task Abrir()
     {
+        Inventario = new InventarioEstoque();
         codigo = $"INV-{DateTime.Now:yyyyMMdd-HHmm}";
         observacao = string.Empty;
         mensagemErro = null;
