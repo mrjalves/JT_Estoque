@@ -1,6 +1,7 @@
 using JT_Aplicacao.Config;
 using JT_Classes.Acessos;
 using JT_Classes.CRM;
+using JT_Estoque.Core.Data;
 using JT_Estoque.Core.Entities;
 using JT_Estoque.Core.IATools;
 using JT_Estoque.Core.Services;
@@ -131,5 +132,23 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(
         typeof(MainLayout).Assembly
     );
+
+// 10. Execução de Migração de Schema e Mock Data em Desenvolvimento
+if (app.Environment.IsDevelopment())
+{
+    var connString = builder.Configuration["Config:Conexao:StringConexao"];
+    if (!string.IsNullOrWhiteSpace(connString))
+    {
+        try
+        {
+            await EstoqueMockSeeder.ExecutarAsync(connString, garantirSchema: true);
+            Console.WriteLine("[MOCK] Dados de teste do Estoque carregados com sucesso.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MOCK][AVISO] Falha ao executar mock data na inicialização: {ex.Message}");
+        }
+    }
+}
 
 app.Run();

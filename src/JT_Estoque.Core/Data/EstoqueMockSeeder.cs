@@ -10,11 +10,27 @@ namespace JT_Estoque.Core.Data
     {
         /// <summary>
         /// Executa o script de mock data no banco de dados indicado pela string de conexão.
+        /// Opcionalmente executa o DbSchemaMigrator antes para assegurar a criação prévia de tabelas e colunas.
         /// </summary>
-        public static async Task ExecutarAsync(string connectionString)
+        public static async Task ExecutarAsync(string connectionString, bool garantirSchema = true)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentException("A connection string não pode ser nula ou vazia.", nameof(connectionString));
+
+            if (garantirSchema)
+            {
+                try
+                {
+                    Console.WriteLine("[MOCK] Verificando e provisionando schema das entidades antes do seed...");
+                    var migrator = new JT_Infra_Data.Schemas.DbSchemaMigrator(connectionString);
+                    migrator.AplicarMigracoes(dryRun: false);
+                    Console.WriteLine("[MOCK] Schema do banco verificado/provisionado com sucesso.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[MOCK][AVISO] Não foi possível verificar schema via DbSchemaMigrator: {ex.Message}");
+                }
+            }
 
             var scriptPath = ObterCaminhoScript();
             if (!File.Exists(scriptPath))
@@ -22,8 +38,10 @@ namespace JT_Estoque.Core.Data
                 throw new FileNotFoundException($"Script de mock não encontrado em '{scriptPath}'.");
             }
 
+            Console.WriteLine($"[MOCK] Executando script SQL de seed a partir de: {scriptPath}");
             var scriptSql = await File.ReadAllTextAsync(scriptPath);
             await ExecutarScriptSqlAsync(connectionString, scriptSql);
+            Console.WriteLine("[MOCK] Script SQL de seed executado com sucesso.");
         }
 
         /// <summary>
