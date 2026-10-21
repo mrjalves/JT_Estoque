@@ -15,7 +15,10 @@
     <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_Infra_Data\JT_Infra_Data.csproj" />
     <ProjectReference Include="..\..\..\JT_ApplicationLayer\JT_Servicos\JT_Servicos.csproj" />
   </ItemGroup>
-
-
+  <ItemGroup>
+    <None Update="Data\SeedMockDataEstoque.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
 </Project>
