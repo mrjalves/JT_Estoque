@@ -56,6 +56,8 @@ builder.Services.AddRazorComponents()
 
 // 6. Registra armazenamento seguro na Web e interface compartilhada
 builder.Services.AddScoped<ISecureStorageService, WebSecureStorageService>();
+builder.Services.AddScoped<IRequestConfigProvider, EstoqueRequestConfigProvider>();
+builder.Services.AddScoped<JT_Servicos.Comum.SchemaService>();
 builder.Services.AddJTUserInterface();
 
 // 7. Configuração do HttpClient padrão com cabeçalho X-Client-Config (Multi-Tenant)
@@ -81,6 +83,12 @@ builder.Services.AddScoped(sp =>
     if (!httpClient.DefaultRequestHeaders.Contains("X-Client-Config"))
     {
         httpClient.DefaultRequestHeaders.Add("X-Client-Config", encoded);
+    }
+
+    var currentUser = sp.GetService<CurrentUserState>();
+    if (currentUser != null && !string.IsNullOrWhiteSpace(currentUser.IdToken) && httpClient.DefaultRequestHeaders.Authorization == null)
+    {
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", currentUser.IdToken);
     }
 
     return httpClient;
