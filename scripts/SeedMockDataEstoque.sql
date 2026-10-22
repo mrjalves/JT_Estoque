@@ -116,7 +116,7 @@ DECLARE @CatCabosId INT = (SELECT TOP 1 Id FROM Categorias WHERE Nome = 'Cabos &
 DECLARE @CatRedesId INT = (SELECT TOP 1 Id FROM Categorias WHERE Nome = 'Equipamentos de Rede' AND TipoEntidade = 'ProdutoEstoque');
 DECLARE @CatInsumosId INT = (SELECT TOP 1 Id FROM Categorias WHERE Nome = 'Insumos & Suprimentos' AND TipoEntidade = 'ProdutoEstoque');
 
-PRINT '   Categorias verificadas/inseridas.';
+PRINT '   Categorias verificadas/inseridos.';
 
 -- =========================================================================================
 -- 4. FORNECEDORES (Fornecedores)
@@ -125,20 +125,20 @@ PRINT '4. Inserindo Fornecedores Homologados...';
 
 IF NOT EXISTS (SELECT 1 FROM Fornecedores WHERE Nome = 'Tech Distribuidora Nacional Ltda')
 BEGIN
-    INSERT INTO Fornecedores (Nome, Email, Telefone, Observacoes, Ativo, DataCadastro, TipoPessoa, UserId)
-    VALUES ('Tech Distribuidora Nacional Ltda', 'vendas@techdistribuidora.com.br', '(11) 3456-7890', 'Fornecedor homologado para hardware, mouses e monitores. Faturamento 28 DDL.', 1, GETDATE(), 2, 'supervisor');
+    INSERT INTO Fornecedores (Nome, Email, Telefone, Observacoes, Ativo, DataCadastro, DataNascimento, TipoPessoa, UserId)
+    VALUES ('Tech Distribuidora Nacional Ltda', 'vendas@techdistribuidora.com.br', '(11) 3456-7890', 'Fornecedor homologado para hardware, mouses e monitores. Faturamento 28 DDL.', 1, GETDATE(), '2000-01-01', 2, 'supervisor');
 END
 
 IF NOT EXISTS (SELECT 1 FROM Fornecedores WHERE Nome = 'Connect Log Soluções em Conectividade S/A')
 BEGIN
-    INSERT INTO Fornecedores (Nome, Email, Telefone, Observacoes, Ativo, DataCadastro, TipoPessoa, UserId)
-    VALUES ('Connect Log Soluções em Conectividade S/A', 'comercial@connectlog.com.br', '(19) 3210-9876', 'Distribuidor exclusivo de cabos Furukawa e conectores blindados.', 1, GETDATE(), 2, 'supervisor');
+    INSERT INTO Fornecedores (Nome, Email, Telefone, Observacoes, Ativo, DataCadastro, DataNascimento, TipoPessoa, UserId)
+    VALUES ('Connect Log Soluções em Conectividade S/A', 'comercial@connectlog.com.br', '(19) 3210-9876', 'Distribuidor exclusivo de cabos Furukawa e conectores blindados.', 1, GETDATE(), '2000-01-01', 2, 'supervisor');
 END
 
 IF NOT EXISTS (SELECT 1 FROM Fornecedores WHERE Nome = 'MacroRedes Telecom e Informática Eireli')
 BEGIN
-    INSERT INTO Fornecedores (Nome, Email, Telefone, Observacoes, Ativo, DataCadastro, TipoPessoa, UserId)
-    VALUES ('MacroRedes Telecom e Informática Eireli', 'pedidos@macroredes.com.br', '(41) 3344-5566', 'Importador direto de roteadores e switches corporativos.', 1, GETDATE(), 2, 'supervisor');
+    INSERT INTO Fornecedores (Nome, Email, Telefone, Observacoes, Ativo, DataCadastro, DataNascimento, TipoPessoa, UserId)
+    VALUES ('MacroRedes Telecom e Informática Eireli', 'pedidos@macroredes.com.br', '(41) 3344-5566', 'Importador direto de roteadores e switches corporativos.', 1, GETDATE(), '2000-01-01', 2, 'supervisor');
 END
 
 DECLARE @FornTechId INT = (SELECT TOP 1 Id FROM Fornecedores WHERE Nome = 'Tech Distribuidora Nacional Ltda');

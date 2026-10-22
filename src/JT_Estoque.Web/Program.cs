@@ -34,6 +34,58 @@ if (configSection != null)
 }
 Config.Instancia.ClientId = "JT_Estoque";
 
+// 2.1 CLI administrativa para migração/seed/reset do módulo Estoque
+var executarMigracao = args.Any(a => a.Equals("--migrate-estoque", StringComparison.OrdinalIgnoreCase));
+var executarSeed = args.Any(a => a.Equals("--seed-estoque", StringComparison.OrdinalIgnoreCase));
+var executarReset = args.Any(a => a.Equals("--reset-estoque", StringComparison.OrdinalIgnoreCase));
+var executarDryRun = args.Any(a => a.Equals("--dry-run", StringComparison.OrdinalIgnoreCase));
+
+if (executarMigracao || executarSeed || executarReset)
+{
+    var connStringCli = builder.Configuration["Config:Clientes:JT_Estoque:StringConexao"]
+                     ?? builder.Configuration["Config:Conexao:StringConexao"];
+
+    if (string.IsNullOrWhiteSpace(connStringCli))
+    {
+        Console.Error.WriteLine("[MOCK][ERRO] String de conexão não configurada em Config:Clientes:JT_Estoque:StringConexao ou Config:Conexao:StringConexao.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    try
+    {
+        Console.WriteLine("[MOCK] Execução administrativa do Estoque iniciada.");
+        Console.WriteLine($"[MOCK] Ações: migrar={executarMigracao}, seed={executarSeed}, reset={executarReset}, dry-run={executarDryRun}");
+
+        await EstoqueMockSeeder.ExecutarAsync(
+            connStringCli,
+            garantirSchema: executarMigracao || executarSeed,
+            reset: executarReset,
+            dryRun: executarDryRun,
+            removerOrfaos: false,
+            aplicarSeed: executarSeed);
+
+        Console.WriteLine("[MOCK] Execução administrativa concluída.");
+        return;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[MOCK][ERRO] {ex.Message}");
+        Environment.ExitCode = 1;
+        return;
+    }
+}
+
+// 2.2 Validação mínima para execução local (TipoConexao=REDE)
+var modoApi = !string.Equals(Config.Instancia.Executor, "API", StringComparison.OrdinalIgnoreCase)
+           && string.Equals(Config.Instancia.TipoConexao, "API", StringComparison.OrdinalIgnoreCase);
+
+if (!modoApi && (string.IsNullOrWhiteSpace(Config.Instancia.JwtSecretKey) || Config.Instancia.JwtSecretKey.Length < 32))
+{
+    throw new InvalidOperationException(
+        "Config:JwtSecretKey deve estar configurada com pelo menos 32 caracteres para execução local (TipoConexao=REDE).");
+}
+
 // 3. Inicializa e registra o FirebaseConfig
 builder.Services.Configure<FirebaseConfig>(builder.Configuration.GetSection("Config:FirebaseConfig"));
 var secaoFConfig = builder.Configuration.GetSection("Config:FirebaseConfig").Get<FirebaseConfig>();
@@ -136,7 +188,8 @@ app.MapRazorComponents<App>()
 // 10. Execução de Migração de Schema e Mock Data em Desenvolvimento
 if (app.Environment.IsDevelopment())
 {
-    var connString = builder.Configuration["Config:Conexao:StringConexao"];
+    var connString = builder.Configuration["Config:Clientes:JT_Estoque:StringConexao"]
+                  ?? builder.Configuration["Config:Conexao:StringConexao"];
     if (!string.IsNullOrWhiteSpace(connString))
     {
         try

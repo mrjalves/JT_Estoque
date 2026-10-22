@@ -2,7 +2,7 @@
 # Script de deploy para JT_Estoque no servidor Linux
 set -e
 
-APP_DIR="/var/www/jt_estoque"
+APP_DIR="/var/www/jt_sistemas_estoque"
 SERVICE_NAME="jt_sistemas_estoque"
 
 echo "=== [1/4] Parando serviço $SERVICE_NAME ==="

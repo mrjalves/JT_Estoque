@@ -6,8 +6,8 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/jt_estoque
-ExecStart=/usr/bin/dotnet /var/www/jt_estoque/JT_Estoque.Web.dll
+WorkingDirectory=/var/www/jt_sistemas_estoque
+ExecStart=/usr/bin/dotnet /var/www/jt_sistemas_estoque/JT_Estoque.Web.dll
 Restart=always
 RestartSec=10
 KillSignal=SIGINT
@@ -16,7 +16,7 @@ SyslogIdentifier=jt_sistemas_estoque
 # Variáveis de ambiente da aplicação
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
-Environment=ASPNETCORE_URLS=http://127.0.0.1:5042
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5004
 
 [Install]
 WantedBy=multi-user.target

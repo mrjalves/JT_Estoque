@@ -7,8 +7,8 @@ Este documento descreve todo o passo a passo para hospedar o **JT_Estoque.Web** 
 ## 1. Visão Geral da Arquitetura no Servidor
 
 - **Aplicação**: `JT_Estoque.Web` (.NET 10 Blazor Server).
-- **Porta Kestrel (Interna)**: `http://127.0.0.1:5042`.
-- **Diretório da Publicação**: `/var/www/jt_estoque`.
+- **Porta Kestrel (Interna)**: `http://127.0.0.1:5004`.
+- **Diretório da Publicação**: `/var/www/jt_sistemas_estoque`.
 - **Serviço Systemd**: `jt_sistemas_estoque.service`.
 - **Domínio Público**: `https://estoque.jtecsistemas.com.br`.
 - **Proxy Reverso**: Nginx escutando na porta `80` (redirecionamento HTTP -> HTTPS) e `443` (SSL).
@@ -31,8 +31,8 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/jt_estoque
-ExecStart=/usr/bin/dotnet /var/www/jt_estoque/JT_Estoque.Web.dll
+WorkingDirectory=/var/www/jt_sistemas_estoque
+ExecStart=/usr/bin/dotnet /var/www/jt_sistemas_estoque/JT_Estoque.Web.dll
 Restart=always
 RestartSec=10
 KillSignal=SIGINT
@@ -41,7 +41,7 @@ SyslogIdentifier=jt_sistemas_estoque
 # Variáveis de ambiente da aplicação
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
-Environment=ASPNETCORE_URLS=http://127.0.0.1:5042
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5004
 
 [Install]
 WantedBy=multi-user.target
@@ -79,7 +79,7 @@ server {
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://localhost:5042;
+        proxy_pass http://localhost:5004;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
@@ -155,7 +155,7 @@ dotnet publish src/JT_Estoque.Web/JT_Estoque.Web.csproj -c Release -o ./publish
 
 Em seguida, envie a pasta `./publish` para a VPS via SCP, SFTP ou Rsync:
 ```bash
-scp -r ./publish/* root@jtecsistemas.com.br:/var/www/jt_estoque/
+scp -r ./publish/* root@jtecsistemas.com.br:/var/www/jt_sistemas_estoque/
 ```
 
 ### 3.2. Script de Deploy na VPS (`deploy-estoque.sh`)
@@ -163,8 +163,8 @@ scp -r ./publish/* root@jtecsistemas.com.br:/var/www/jt_estoque/
 Para automatizar a reinicialização e permissões na VPS:
 
 ```bash
-sudo chmod +x /var/www/jt_estoque/scripts/linux/deploy-estoque.sh
-sudo /var/www/jt_estoque/scripts/linux/deploy-estoque.sh
+sudo chmod +x /var/www/jt_sistemas_estoque/scripts/linux/deploy-estoque.sh
+sudo /var/www/jt_sistemas_estoque/scripts/linux/deploy-estoque.sh
 ```
 
 Conteúdo do script (`scripts/linux/deploy-estoque.sh`):
@@ -172,7 +172,7 @@ Conteúdo do script (`scripts/linux/deploy-estoque.sh`):
 #!/usr/bin/env bash
 set -e
 
-APP_DIR="/var/www/jt_estoque"
+APP_DIR="/var/www/jt_sistemas_estoque"
 SERVICE_NAME="jt_sistemas_estoque"
 
 echo "=== [1/4] Parando serviço $SERVICE_NAME ==="
@@ -192,6 +192,58 @@ sudo nginx -t && sudo systemctl reload nginx
 
 echo "=== Deploy concluído com sucesso! ==="
 ```
+
+### 3.3. Migração, Reset e Seed dos Dados Mock
+
+Antes de executar, ajuste o `appsettings.Production.json` na VPS:
+
+```json
+{
+  "Config": {
+    "Conexao": {
+      "TipoConexao": "REDE",
+      "StringConexao": "Data Source=179.198.119.165;Initial Catalog=JT_Estoque;User ID=...;Password=...;TrustServerCertificate=True;"
+    },
+    "Clientes": {
+      "JT_Estoque": {
+        "StringConexao": "Data Source=179.198.119.165;Initial Catalog=JT_Estoque;User ID=...;Password=...;TrustServerCertificate=True;"
+      }
+    },
+    "Executor": "Sistema",
+    "JwtSecretKey": "uma-chave-com-pelo-menos-32-caracteres",
+    "Migration": {
+      "RemoverOrfaos": false
+    }
+  }
+}
+```
+
+> `JwtSecretKey` é obrigatória no modo local (`TipoConexao=REDE`) e deve ter no mínimo 32 caracteres.
+
+Execute o script (para o serviço, limpa o cache SQLite, migra, reseta e aplica o seed):
+
+```bash
+sudo chmod +x /var/www/jt_sistemas_estoque/scripts/linux/seed-estoque.sh
+sudo /var/www/jt_sistemas_estoque/scripts/linux/seed-estoque.sh
+```
+
+Para apenas validar o DDL sem alterar dados:
+
+```bash
+sudo /var/www/jt_sistemas_estoque/scripts/linux/seed-estoque.sh --dry-run
+```
+
+Também é possível chamar a CLI diretamente:
+
+```bash
+cd /var/www/jt_sistemas_estoque
+sudo -u www-data dotnet JT_Estoque.Web.dll --migrate-estoque             # só migra
+sudo -u www-data dotnet JT_Estoque.Web.dll --reset-estoque               # só remove mock
+sudo -u www-data dotnet JT_Estoque.Web.dll --seed-estoque                # migra + seed (sem reset)
+sudo -u www-data dotnet JT_Estoque.Web.dll --migrate-estoque --reset-estoque --seed-estoque
+```
+
+> O reset remove os registros mock e também movimentações/lotes vinculados aos SKUs mock, inclusive lançamentos manuais desses produtos. Faça backup antes.
 
 ---
 

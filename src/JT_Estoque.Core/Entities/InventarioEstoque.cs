@@ -32,7 +32,7 @@ namespace JT_Estoque.Core.Entities
         [TipoColuna("VARCHAR(500)")]
         public string Observacoes { get; set; } = string.Empty;
 
-        [Relacionamento(TipoRelacionamento.Composicao, "Id")]
+        [Relacionamento(TipoRelacionamento.Composicao, "InventarioId")]
         public List<InventarioItem> Itens { get; set; } = [];
 
         public override List<Filtro> CarregarFiltros()
