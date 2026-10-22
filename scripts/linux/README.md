@@ -10,6 +10,10 @@ Esta pasta contém os arquivos de configuração para hospedar o **JT_Estoque.We
    - Script para automatizar o deploy na VPS (parada do serviço, permissões e reload).
 4. **[seed-estoque.sh](file:///c:/Users/sirja/source/repos/mrjalves/JT_Estoque/scripts/linux/seed-estoque.sh)**:
    - Migra o schema, limpa o cache SQLite, reseta e aplica os dados mock do Estoque.
+   - Não é publicado pelo `dotnet publish`; instale em `/usr/local/bin` conforme o checklist.
+5. **[appsettings.Production.example.json](file:///c:/Users/sirja/source/repos/mrjalves/JT_Estoque/scripts/linux/appsettings.Production.example.json)**:
+   - Modelo para criar o `appsettings.Production.json` na VPS (modo `REDE`, JWT e migração).
 
 Para o manual completo e resolução do certificado SSL (HTTPS / Certbot), consulte:
 - **[docs/DEPLOY_VPS_NGINX_SSL.md](file:///c:/Users/sirja/source/repos/mrjalves/JT_Estoque/docs/DEPLOY_VPS_NGINX_SSL.md)**
+- **[docs/CHECKLIST_IMPLANTACAO_VPS.md](file:///c:/Users/sirja/source/repos/mrjalves/JT_Estoque/docs/CHECKLIST_IMPLANTACAO_VPS.md)**

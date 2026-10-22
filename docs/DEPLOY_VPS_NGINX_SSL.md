@@ -195,6 +195,8 @@ echo "=== Deploy concluído com sucesso! ==="
 
 ### 3.3. Migração, Reset e Seed dos Dados Mock
 
+O roteiro completo (incluindo backup, validação e troubleshooting) está em [CHECKLIST_IMPLANTACAO_VPS.md](CHECKLIST_IMPLANTACAO_VPS.md). O modelo pronto está em [appsettings.Production.example.json](../scripts/linux/appsettings.Production.example.json).
+
 Antes de executar, ajuste o `appsettings.Production.json` na VPS:
 
 ```json
@@ -220,17 +222,23 @@ Antes de executar, ajuste o `appsettings.Production.json` na VPS:
 
 > `JwtSecretKey` é obrigatória no modo local (`TipoConexao=REDE`) e deve ter no mínimo 32 caracteres.
 
+O `dotnet publish` não inclui a pasta `scripts/`, então instale o script uma única vez na VPS:
+
+```bash
+scp -P VPS_PORT scripts/linux/seed-estoque.sh VPS_USER@VPS_HOST:/tmp/seed-estoque.sh
+ssh -p VPS_PORT VPS_USER@VPS_HOST 'sudo install -m 755 /tmp/seed-estoque.sh /usr/local/bin/seed-estoque.sh && rm -f /tmp/seed-estoque.sh'
+```
+
 Execute o script (para o serviço, limpa o cache SQLite, migra, reseta e aplica o seed):
 
 ```bash
-sudo chmod +x /var/www/jt_sistemas_estoque/scripts/linux/seed-estoque.sh
-sudo /var/www/jt_sistemas_estoque/scripts/linux/seed-estoque.sh
+sudo /usr/local/bin/seed-estoque.sh
 ```
 
 Para apenas validar o DDL sem alterar dados:
 
 ```bash
-sudo /var/www/jt_sistemas_estoque/scripts/linux/seed-estoque.sh --dry-run
+sudo /usr/local/bin/seed-estoque.sh --dry-run
 ```
 
 Também é possível chamar a CLI diretamente:
